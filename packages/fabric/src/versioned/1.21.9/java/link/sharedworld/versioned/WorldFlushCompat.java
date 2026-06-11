@@ -1,6 +1,7 @@
 package link.sharedworld.versioned;
 
 import link.sharedworld.mixin.versioned.ChunkStorageWorkerAccessor;
+import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.server.level.ServerLevel;
 
 import java.util.concurrent.CompletableFuture;
@@ -17,5 +18,13 @@ public final class WorldFlushCompat {
 
     public static CompletableFuture<?> synchronizeChunks(ServerLevel level) {
         return ((ChunkStorageWorkerAccessor) level.getChunkSource().chunkMap).sharedworld$getWorker().synchronize(false);
+    }
+
+    public static boolean isAutoSave(IntegratedServer server) {
+        return server.isAutoSave();
+    }
+
+    public static void setAutoSave(IntegratedServer server, boolean enabled) {
+        server.setAutoSave(enabled);
     }
 }
