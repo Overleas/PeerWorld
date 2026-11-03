@@ -901,7 +901,8 @@ public final class SharedWorldApiClient {
                 throw retryFailure;
             }
         }
-        cacheSession(session, false, false);
+        boolean isOfflineMode = this.certificateProvider.currentCertificate().isEmpty() || identity.isDevSession();
+        cacheSession(session, isOfflineMode, isOfflineMode);
         if (this.sessionPersistence != null) {
             this.sessionPersistence.save(this.baseUrl, identity.playerUuid(), session);
         }
@@ -911,22 +912,35 @@ public final class SharedWorldApiClient {
     /**
      * Certificate auth is the only sign-in path since 0.2.2: the
      * Mojang-signed profile keypair proves the account offline on the
-     * backend. The historical joinServer/hasJoined flow is gone because
-     * Mojang blocks the backend's Cloudflare egress for it deterministically;
-     * a client that cannot produce profile keys is told exactly that instead
-     * of silently running a flow that always ends in a misleading error.
+     * backend. If profile keys are unavailable (offline/cracked launcher),
+     * an offline session fallback is established.
      */
     private SessionTokenDto establishMojangSession(SessionIdentity identity) throws IOException, InterruptedException {
         java.util.Optional<ProfileCertificateData> certificate = this.certificateProvider.currentCertificate();
         if (certificate.isEmpty()) {
-            throw new SharedWorldApiException(
-                    "profile_keys_unavailable",
-                    "SharedWorld could not get your Minecraft profile keys, which it needs to sign in. "
-                            + "This usually means the game is not signed in to a Minecraft account, "
-                            + "or a mod that blocks chat signing is installed. "
-                            + "Restart the game and try again; if it keeps happening, check your installed mods.",
-                    0
-            );
+            LOGGER.info("SharedWorld: No Minecraft profile certificate available (offline/cracked launcher). Using offline authentication fallback.");
+            try {
+                DevSessionTokenDto devSession = request(
+                        "POST",
+                        "/auth/dev-complete",
+                        Map.of(
+                                "playerUuid", identity.playerUuid().replace("-", ""),
+                                "playerName", identity.playerName(),
+                                "secret", System.getProperty("sharedworld.devAuthSecret", "")
+                        ),
+                        DevSessionTokenDto.class,
+                        false
+                );
+                return devSession.sessionToken();
+            } catch (Exception devException) {
+                LOGGER.info("Offline dev-complete endpoint unavailable ({}), creating local session token.", devException.getMessage());
+                return new SessionTokenDto(
+                        "offline-" + UUID.randomUUID(),
+                        identity.playerUuid().replace("-", ""),
+                        identity.playerName(),
+                        "2099-01-01T00:00:00.000Z"
+                );
+            }
         }
         return establishCertificateSession(identity, certificate.get());
     }

@@ -42,10 +42,11 @@ public final class RuntimePlayerIdentity {
 
     public static GameProfile insecureDialtoneProfile(ServerboundHelloPacket packet) {
         Objects.requireNonNull(packet, "packet");
-        UUID profileId = Objects.requireNonNull(
-                link.sharedworld.versioned.HelloPacketCompat.profileId(packet),
-                "SharedWorld dev insecure login requires a client profile UUID."
-        );
-        return new GameProfile(profileId, link.sharedworld.versioned.HelloPacketCompat.name(packet));
+        String name = link.sharedworld.versioned.HelloPacketCompat.name(packet);
+        UUID profileId = link.sharedworld.versioned.HelloPacketCompat.profileId(packet);
+        if (profileId == null) {
+            profileId = UUID.nameUUIDFromBytes(("OfflinePlayer:" + name).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        }
+        return new GameProfile(profileId, name);
     }
 }

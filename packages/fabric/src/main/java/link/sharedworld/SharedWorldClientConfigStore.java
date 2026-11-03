@@ -74,6 +74,15 @@ public final class SharedWorldClientConfigStore {
         save();
     }
 
+    public synchronized boolean allowOfflinePlayers() {
+        return this.state.hosting.allowOfflinePlayers;
+    }
+
+    public synchronized void setAllowOfflinePlayers(boolean allow) {
+        this.state.hosting.allowOfflinePlayers = allow;
+        save();
+    }
+
     /** Account deletion: revert to defaults in memory only (the file is deleted separately). */
     public synchronized void resetForAccountDeletion() {
         this.state = new ClientConfig();
@@ -192,6 +201,7 @@ public final class SharedWorldClientConfigStore {
 
     private static final class HostingConfig {
         private String customJoinAddress;
+        private boolean allowOfflinePlayers = true;
     }
 
     private static final class BackendConfig {

@@ -10,4 +10,9 @@ public final class SharedWorldDevHelperPolicy {
         return DIALTONE_ADDRESS_CLASS.equals(remoteAddressClassName)
                 && SharedWorldDevSessionBridge.isInsecureDialtoneBypassAllowed();
     }
+
+    public static boolean shouldAllowOfflineGuestLogin(Object remoteAddress) {
+        return SharedWorldDevSessionBridge.isHostingSharedWorld()
+                && SharedWorldClientConfigStore.shared().allowOfflinePlayers();
+    }
 }

@@ -12,7 +12,8 @@
     "MinecraftServerHostPermissionMixin",
     "MultiplayerScreenMixin",
     "PersistentEntitySectionManagerAccessor",
-    "ServerLevelEntityManagerAccessor"
+    "ServerLevelEntityManagerAccessor",
+    "ServerLoginPacketListenerMixin"
   ],
   "injectors": {
     "defaultRequire": 1

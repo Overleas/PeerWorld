@@ -63,6 +63,9 @@ public final class SettingsScreen extends link.sharedworld.versioned.VersionedSc
     private Button backButton;
     private Button saveButton;
     private EditBox customJoinBox;
+    private Button toggleOfflineButton;
+    private boolean savedAllowOffline;
+    private boolean currentAllowOffline;
     /** Last value persisted to the local config store ("" = none). */
     private String savedCustomJoinAddress = "";
 
@@ -91,6 +94,16 @@ public final class SettingsScreen extends link.sharedworld.versioned.VersionedSc
         }).width(200).build();
 
         this.savedCustomJoinAddress = blankOr(link.sharedworld.SharedWorldClientConfigStore.shared().customJoinAddress(), "");
+        this.savedAllowOffline = link.sharedworld.SharedWorldClientConfigStore.shared().allowOfflinePlayers();
+        this.currentAllowOffline = this.savedAllowOffline;
+        this.toggleOfflineButton = Button.builder(
+                Component.literal("Allow Offline/Cracked Players: " + (this.currentAllowOffline ? "ON" : "OFF")),
+                button -> {
+                    this.currentAllowOffline = !this.currentAllowOffline;
+                    button.setMessage(Component.literal("Allow Offline/Cracked Players: " + (this.currentAllowOffline ? "ON" : "OFF")));
+                    this.updateButtons();
+                }
+        ).width(220).build();
         this.customJoinBox = new EditBox(this.font, 0, 0, 220, 20, Component.translatable("screen.sharedworld.custom_join_address"));
         this.customJoinBox.setMaxLength(260);
         this.customJoinBox.setHint(SharedWorldText.hint("screen.sharedworld.custom_join_address_hint"));
@@ -222,7 +235,7 @@ public final class SettingsScreen extends link.sharedworld.versioned.VersionedSc
             return false;
         }
         String current = blankOr(link.sharedworld.host.CustomJoinAddressPolicy.normalize(this.customJoinBox.getValue()), "");
-        return !current.equals(this.savedCustomJoinAddress);
+        return !current.equals(this.savedCustomJoinAddress) || this.currentAllowOffline != this.savedAllowOffline;
     }
 
     private boolean isAdvancedValid() {
@@ -240,6 +253,8 @@ public final class SettingsScreen extends link.sharedworld.versioned.VersionedSc
         String value = link.sharedworld.host.CustomJoinAddressPolicy.normalize(this.customJoinBox.getValue());
         link.sharedworld.SharedWorldClientConfigStore.shared().setCustomJoinAddress(value);
         this.savedCustomJoinAddress = value == null ? "" : value;
+        link.sharedworld.SharedWorldClientConfigStore.shared().setAllowOfflinePlayers(this.currentAllowOffline);
+        this.savedAllowOffline = this.currentAllowOffline;
         this.statusBanner.setTransient(SharedWorldStatusBanner.Kind.SUCCESS,
                 Component.translatable("screen.sharedworld.settings_saved"), SUCCESS_STATUS_TTL_MS);
         this.updateButtons();
@@ -514,12 +529,14 @@ public final class SettingsScreen extends link.sharedworld.versioned.VersionedSc
         @Override
         public void visitChildren(Consumer<AbstractWidget> consumer) {
             consumer.accept(SettingsScreen.this.customJoinBox);
+            consumer.accept(SettingsScreen.this.toggleOfflineButton);
         }
 
         @Override
         public void doLayout(ScreenRectangle area) {
             SettingsScreen.this.customJoinBox.setWidth(Math.min(220, area.width() - 76));
             SettingsScreen.this.customJoinBox.setPosition(SettingsScreen.this.width / 2 - SettingsScreen.this.customJoinBox.getWidth() / 2, area.top() + 24);
+            SettingsScreen.this.toggleOfflineButton.setPosition(SettingsScreen.this.width / 2 - 110, area.top() + 54);
         }
     }
 }
