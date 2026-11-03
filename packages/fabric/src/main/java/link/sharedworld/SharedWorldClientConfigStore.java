@@ -43,7 +43,10 @@ public final class SharedWorldClientConfigStore {
 
     public synchronized String configuredBackendBaseUrl() {
         String configured = normalizeBaseUrl(this.state.backend.baseUrl);
-        return configured == null ? SharedWorldBackendConstants.DEFAULT_BASE_URL : configured;
+        if (configured == null || configured.contains("api.sharedworld.net")) {
+            return SharedWorldBackendConstants.DEFAULT_BASE_URL;
+        }
+        return configured;
     }
 
     public synchronized void setConfiguredBackendBaseUrl(String baseUrl) {
@@ -56,12 +59,12 @@ public final class SharedWorldClientConfigStore {
         if (override != null) {
             return override;
         }
-        String configured = normalizeBaseUrl(this.state.backend.baseUrl);
-        if (configured != null) {
-            return configured;
-        }
         if (isLocalServerReachable()) {
             return "http://127.0.0.1:8787";
+        }
+        String configured = normalizeBaseUrl(this.state.backend.baseUrl);
+        if (configured != null && !configured.contains("api.sharedworld.net") && !configured.contains("127.0.0.1") && !configured.contains("localhost")) {
+            return configured;
         }
         return configuredBackendBaseUrl();
     }
@@ -152,6 +155,9 @@ public final class SharedWorldClientConfigStore {
             sanitized.backend = new BackendConfig();
         }
         sanitized.backend.baseUrl = normalizeBaseUrl(sanitized.backend.baseUrl);
+        if (sanitized.backend.baseUrl != null && sanitized.backend.baseUrl.contains("api.sharedworld.net")) {
+            sanitized.backend.baseUrl = SharedWorldBackendConstants.DEFAULT_BASE_URL;
+        }
         if (sanitized.ui == null) {
             sanitized.ui = new UiConfig();
         }
