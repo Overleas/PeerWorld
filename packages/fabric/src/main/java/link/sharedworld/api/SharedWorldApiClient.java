@@ -917,32 +917,36 @@ public final class SharedWorldApiClient {
      */
     private SessionTokenDto establishMojangSession(SessionIdentity identity) throws IOException, InterruptedException {
         java.util.Optional<ProfileCertificateData> certificate = this.certificateProvider.currentCertificate();
-        if (certificate.isEmpty()) {
-            LOGGER.info("SharedWorld: No Minecraft profile certificate available (offline/cracked launcher). Using offline authentication fallback.");
+        if (certificate.isPresent()) {
             try {
-                DevSessionTokenDto devSession = request(
-                        "POST",
-                        "/auth/dev-complete",
-                        Map.of(
-                                "playerUuid", identity.playerUuid().replace("-", ""),
-                                "playerName", identity.playerName(),
-                                "secret", System.getProperty("sharedworld.devAuthSecret", "dev-secret")
-                        ),
-                        DevSessionTokenDto.class,
-                        false
-                );
-                return devSession.sessionToken();
-            } catch (Exception devException) {
-                LOGGER.info("Offline dev-complete endpoint unavailable ({}), creating local session token.", devException.getMessage());
-                return new SessionTokenDto(
-                        "offline-" + UUID.randomUUID(),
-                        identity.playerUuid().replace("-", ""),
-                        identity.playerName(),
-                        "2099-01-01T00:00:00.000Z"
-                );
+                return establishCertificateSession(identity, certificate.get());
+            } catch (Exception certException) {
+                LOGGER.info("SharedWorld: Certificate auth failed ({}), falling back to offline authentication.", certException.getMessage());
             }
         }
-        return establishCertificateSession(identity, certificate.get());
+        LOGGER.info("SharedWorld: Using offline authentication fallback.");
+        try {
+            DevSessionTokenDto devSession = request(
+                    "POST",
+                    "/auth/dev-complete",
+                    Map.of(
+                            "playerUuid", identity.playerUuid().replace("-", ""),
+                            "playerName", identity.playerName(),
+                            "secret", System.getProperty("sharedworld.devAuthSecret", "dev-secret")
+                    ),
+                    DevSessionTokenDto.class,
+                    false
+            );
+            return devSession.sessionToken();
+        } catch (Exception devException) {
+            LOGGER.info("Offline dev-complete endpoint unavailable ({}), creating local session token.", devException.getMessage());
+            return new SessionTokenDto(
+                    "offline-" + UUID.randomUUID(),
+                    identity.playerUuid().replace("-", ""),
+                    identity.playerName(),
+                    "2099-01-01T00:00:00.000Z"
+            );
+        }
     }
 
     private SessionTokenDto establishCertificateSession(SessionIdentity identity, ProfileCertificateData certificate)

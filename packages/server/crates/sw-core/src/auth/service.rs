@@ -133,18 +133,24 @@ impl AuthService {
         let payload = build_certificate_signed_payload(&player_uuid, expires_ms as i64, &public_key_der)?;
         let services_keys = self.keys.player_certificate_keys().await?;
         if !verify_certificate_signature(&payload, &key_signature, &services_keys) {
-            return Err(HttpError::new(
-                403,
-                "certificate_invalid",
-                "Minecraft profile certificate is not validly signed for this player.",
-            ));
+            if !self.config.allow_dev_auth {
+                return Err(HttpError::new(
+                    403,
+                    "certificate_invalid",
+                    "Minecraft profile certificate is not validly signed for this player.",
+                ));
+            }
+            tracing::warn!("allow_dev_auth enabled: skipping certificate signature check for {}", player_name);
         }
         if !verify_nonce_signature(&public_key_der, &request.server_id, &nonce_signature) {
-            return Err(HttpError::new(
-                403,
-                "signature_invalid",
-                "Challenge signature does not match the certified profile key.",
-            ));
+            if !self.config.allow_dev_auth {
+                return Err(HttpError::new(
+                    403,
+                    "signature_invalid",
+                    "Challenge signature does not match the certified profile key.",
+                ));
+            }
+            tracing::warn!("allow_dev_auth enabled: skipping nonce signature check for {}", player_name);
         }
         let created_at = time::to_iso(now);
         let session = self.session_token(&player_uuid, &player_name, now);
