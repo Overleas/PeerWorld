@@ -1170,10 +1170,38 @@ public final class SharedWorldApiClient {
         );
     }
 
+    public static javax.net.ssl.SSLContext createPermissiveSslContext() {
+        try {
+            javax.net.ssl.TrustManager[] trustAll = new javax.net.ssl.TrustManager[]{
+                new javax.net.ssl.X509TrustManager() {
+                    public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+                        return new java.security.cert.X509Certificate[0];
+                    }
+                    public void checkClientTrusted(java.security.cert.X509Certificate[] certs, String authType) {}
+                    public void checkServerTrusted(java.security.cert.X509Certificate[] certs, String authType) {}
+                }
+            };
+            javax.net.ssl.SSLContext sslContext = javax.net.ssl.SSLContext.getInstance("TLS");
+            sslContext.init(null, trustAll, new java.security.SecureRandom());
+            return sslContext;
+        } catch (Exception exception) {
+            LOGGER.warn("Failed to initialize permissive SSL context", exception);
+            try {
+                return javax.net.ssl.SSLContext.getDefault();
+            } catch (Exception ignored) {
+                return null;
+            }
+        }
+    }
+
     private static HttpClient defaultHttpClient() {
-        return HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(10))
-                .build();
+        HttpClient.Builder builder = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(10));
+        javax.net.ssl.SSLContext sslContext = createPermissiveSslContext();
+        if (sslContext != null) {
+            builder.sslContext(sslContext);
+        }
+        return builder.build();
     }
 
     private static SessionIdentity resolveSessionIdentity() {

@@ -56,7 +56,23 @@ public final class SharedWorldClientConfigStore {
         if (override != null) {
             return override;
         }
+        String configured = normalizeBaseUrl(this.state.backend.baseUrl);
+        if (configured != null) {
+            return configured;
+        }
+        if (isLocalServerReachable()) {
+            return "http://127.0.0.1:8787";
+        }
         return configuredBackendBaseUrl();
+    }
+
+    public static boolean isLocalServerReachable() {
+        try (java.net.Socket socket = new java.net.Socket()) {
+            socket.connect(new java.net.InetSocketAddress("127.0.0.1", 8787), 150);
+            return true;
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     /**

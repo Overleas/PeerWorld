@@ -14,7 +14,16 @@ import java.util.concurrent.TimeUnit;
 public final class JdkWebSocketConnector implements SharedWorldPushChannel.TransportConnector {
     private static final long CONNECT_TIMEOUT_SECONDS = 15;
 
-    private final HttpClient httpClient = HttpClient.newHttpClient();
+    private final HttpClient httpClient;
+
+    public JdkWebSocketConnector() {
+        HttpClient.Builder builder = HttpClient.newBuilder();
+        javax.net.ssl.SSLContext sslContext = link.sharedworld.api.SharedWorldApiClient.createPermissiveSslContext();
+        if (sslContext != null) {
+            builder.sslContext(sslContext);
+        }
+        this.httpClient = builder.build();
+    }
 
     @Override
     public SharedWorldPushChannel.Transport connect(

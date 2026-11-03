@@ -51,10 +51,43 @@ public final class SharedWorldClient {
     private SharedWorldClient() {
     }
 
+    private static void ensureLocalCoordinatorStarted() {
+        if (SharedWorldClientConfigStore.isLocalServerReachable()) {
+            return;
+        }
+        try {
+            java.nio.file.Path[] candidates = new java.nio.file.Path[]{
+                link.sharedworld.platform.SharedWorldPlatform.get().configDir().resolve("swcore"),
+                link.sharedworld.platform.SharedWorldPlatform.get().configDir().resolve("sharedworld").resolve("swcore"),
+                java.nio.file.Path.of("/home/overleas/.gemini/antigravity/scratch/sharedworld-offline/packages/server/target/release/swcore")
+            };
+            for (java.nio.file.Path candidate : candidates) {
+                if (java.nio.file.Files.isExecutable(candidate)) {
+                    LOGGER.info("Starting local SharedWorld coordinator: {}", candidate);
+                    new ProcessBuilder(candidate.toAbsolutePath().toString(), "--dev")
+                            .directory(candidate.getParent().toFile())
+                            .redirectErrorStream(true)
+                            .start();
+                    for (int i = 0; i < 20; i++) {
+                        if (SharedWorldClientConfigStore.isLocalServerReachable()) {
+                            LOGGER.info("Local SharedWorld coordinator is ready on 127.0.0.1:8787");
+                            break;
+                        }
+                        Thread.sleep(100);
+                    }
+                    break;
+                }
+            }
+        } catch (Exception exception) {
+            LOGGER.warn("Failed to auto-start local coordinator", exception);
+        }
+    }
+
     public static void init() {
         SharedWorldE4mcCompatibility.logClientInitPhase("init-start");
         link.sharedworld.versioned.ScreenBackdropCompat.install();
         RuntimePlayerIdentity.resolveBackendPlayerUuidWithHyphens(Minecraft.getInstance().getUser());
+        ensureLocalCoordinatorStarted();
         apiClient = new SharedWorldApiClient(SharedWorldClientConfigStore.shared().resolvedBackendBaseUrl());
         apiClient.setSessionPersistence(SharedWorldSessionStore.shared());
         HostPlayerIdentity hostPlayerIdentity = apiClient::authenticatedWorldPlayerUuidWithHyphens;
