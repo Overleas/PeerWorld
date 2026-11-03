@@ -165,14 +165,18 @@ async fn run_integration(args: &Args) -> anyhow::Result<()> {
         db_path: std::env::var("SHAREDWORLD_INTEGRATION_DB_FILE")
             .ok()
             .filter(|v| !v.is_empty())
-            .map(PathBuf::from),
+            .map(PathBuf::from)
+            .or_else(|| args.db.as_ref().map(PathBuf::from))
+            .or_else(|| Some(PathBuf::from("./sharedworld.db"))),
         blob_dir: std::env::var("SHAREDWORLD_INTEGRATION_BLOB_DIR")
             .ok()
             .filter(|v| !v.is_empty())
-            .map(PathBuf::from),
+            .map(PathBuf::from)
+            .or_else(|| Some(PathBuf::from("./blobs"))),
     };
     let state = build_integration_state(&base_url, persistence).await;
     let _ = sw_http::metrics::install_recorder();
+    sw_core::jobs::start(state.svc(), sw_core::jobs::JobsConfig::default());
     let app = build_router(state.clone());
     let listener = tokio::net::TcpListener::bind(args.listen)
         .await
@@ -195,7 +199,7 @@ async fn run_integration(_args: &Args) -> anyhow::Result<()> {
 async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     init_tracing(args.log_json);
-    if args.integration {
+    if args.integration || args.dev {
         return run_integration(&args).await;
     }
     let config = Arc::new(load_config(&args)?);

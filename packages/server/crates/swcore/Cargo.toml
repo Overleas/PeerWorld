@@ -7,7 +7,7 @@ repository.workspace = true
 rust-version.workspace = true
 
 [features]
-default = []
+default = ["testkit"]
 testkit = ["sw-http/testkit", "dep:sw-testkit"]
 
 [dependencies]

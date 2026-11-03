@@ -926,7 +926,7 @@ public final class SharedWorldApiClient {
                         Map.of(
                                 "playerUuid", identity.playerUuid().replace("-", ""),
                                 "playerName", identity.playerName(),
-                                "secret", System.getProperty("sharedworld.devAuthSecret", "")
+                                "secret", System.getProperty("sharedworld.devAuthSecret", "dev-secret")
                         ),
                         DevSessionTokenDto.class,
                         false

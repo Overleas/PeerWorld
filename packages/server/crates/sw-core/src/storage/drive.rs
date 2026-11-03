@@ -202,6 +202,9 @@ impl GoogleDriveStorageProvider {
                 "Google Drive authorization needs to be refreshed.",
             ));
         };
+        if self.config.allow_dev_google_oauth || refresh_token == "dev-google-refresh" {
+            return Ok("dev-google-token".into());
+        }
 
         let form = form_encode(&[
             ("client_id", self.config.google_oauth_client_id.as_deref().unwrap_or("")),
@@ -725,6 +728,12 @@ impl StorageProvider for GoogleDriveStorageProvider {
     }
 
     async fn quota(&self, binding: &StorageBinding) -> HttpResult<StorageQuota> {
+        if self.config.allow_dev_google_oauth {
+            return Ok(StorageQuota {
+                used_bytes: Some(1024 * 1024 * 10),
+                total_bytes: Some(5 * 1024 * 1024 * 1024 * 1024), // 5 TB
+            });
+        }
         let account = self.require_account(binding).await?;
         let req = DriveReq::get(format!("{}/about?fields=storageQuota", self.api_base()));
         let response = self.drive_request(&account, &req).await?;
