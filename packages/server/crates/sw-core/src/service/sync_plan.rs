@@ -884,6 +884,15 @@ pub async fn create_blob_upload_session(
     // retention prune used to bill its reference checks per upload.
     let session_url =
         capable.create_resumable_session(&binding, storage_key, content_type, content_length).await?;
+    let session_url = if let Some(origin) = ctx.request_origin.as_deref() {
+        if session_url.starts_with("http://127.0.0.1:8787") {
+            session_url.replacen("http://127.0.0.1:8787", origin.trim_end_matches('/'), 1)
+        } else {
+            session_url
+        }
+    } else {
+        session_url
+    };
     let upload_id = random_id("upl");
     svc.repository
         .create_upload_session(StorageUploadSessionRecord {

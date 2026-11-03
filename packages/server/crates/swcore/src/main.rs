@@ -160,7 +160,10 @@ fn init_tracing(json: bool) {
 #[cfg(feature = "testkit")]
 async fn run_integration(args: &Args) -> anyhow::Result<()> {
     use sw_testkit::integration::{build_integration_state, IntegrationPersistence};
-    let base_url = format!("http://{}", args.listen);
+    let base_url = std::env::var("SHAREDWORLD_PUBLIC_URL")
+        .ok()
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(|| "https://functioning-upcoming-held-budget.trycloudflare.com".to_string());
     let persistence = IntegrationPersistence {
         db_path: std::env::var("SHAREDWORLD_INTEGRATION_DB_FILE")
             .ok()

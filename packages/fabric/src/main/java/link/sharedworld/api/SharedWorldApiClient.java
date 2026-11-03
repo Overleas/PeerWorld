@@ -500,6 +500,16 @@ public final class SharedWorldApiClient {
      * account of the bytes. A dead session (provider forgot it) is recreated
      * once and only this artifact restarts.
      */
+    private String resolveAbsoluteUrl(String url) {
+        if (url == null) {
+            return null;
+        }
+        if (url.contains("127.0.0.1:8787") && !this.baseUrl.contains("127.0.0.1:8787")) {
+            return url.replace("http://127.0.0.1:8787", this.baseUrl.replaceAll("/+$", ""));
+        }
+        return url;
+    }
+
     public void uploadBlobDirect(
             String worldId,
             String storageKey,
@@ -516,8 +526,9 @@ public final class SharedWorldApiClient {
             SharedWorldModels.CreateBlobSessionResponseDto session =
                     createBlobSession(worldId, storageKey, runtimeEpoch, hostToken, contentType, contentLength, blobStamp);
             long chunkSize = session.chunkSizeBytes() > 0 ? session.chunkSizeBytes() : fallbackChunkSizeBytes;
+            String sessionUrl = resolveAbsoluteUrl(session.sessionUrl());
             try {
-                new ResumableBlobUploader(this.httpClient, session.sessionUrl(), chunkSize)
+                new ResumableBlobUploader(this.httpClient, sessionUrl, chunkSize)
                         .upload(bodyFile, contentType, progressListener);
                 commitBlobSessionWithRetry(worldId, session.uploadId(), runtimeEpoch, hostToken, blobStamp);
                 return;
@@ -575,7 +586,7 @@ public final class SharedWorldApiClient {
                         bodySize
                 );
         HttpRequest.Builder builder = HttpRequest.newBuilder()
-                .uri(URI.create(signedUrl.url()))
+                .uri(URI.create(resolveAbsoluteUrl(signedUrl.url())))
                 // The timeout covers the whole exchange including body
                 // streaming: a 40 MB shard on a residential uplink takes
                 // minutes, so a tight deadline turned every large-world
@@ -638,7 +649,7 @@ public final class SharedWorldApiClient {
         long resumeOffset = Files.exists(partial) ? Files.size(partial) : 0L;
 
         HttpRequest.Builder builder = HttpRequest.newBuilder()
-                .uri(URI.create(signedUrl.url()))
+                .uri(URI.create(resolveAbsoluteUrl(signedUrl.url())))
                 // Bounds time-to-response-headers only; body streaming is
                 // governed by the stall watchdog (java.net.http has no read
                 // timeout, and a fixed whole-exchange deadline is wrong for

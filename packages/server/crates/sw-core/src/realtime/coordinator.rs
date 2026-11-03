@@ -124,6 +124,9 @@ enum Immediate {
 
 fn immediate_entry_kind(resolved: &ResolvedRuntimeState, player_uuid: &str) -> Option<Immediate> {
     if runtime_allows_direct_connect(resolved) {
+        if resolved.runtime.as_ref().is_some_and(|r| r.host_uuid.as_deref() == Some(player_uuid)) {
+            return None;
+        }
         return Some(Immediate::Connect);
     }
     host_assignment_for_current_runtime(resolved, player_uuid).map(Immediate::CurrentHost)
@@ -239,7 +242,14 @@ impl WorldCoordinator {
     ) -> HttpResult<SessionEntryDecision> {
         self.require_session_access(actor, false)?;
         let requested = sanitize_waiter_session_id(waiter_session_id);
-        let resolved = self.resolve(now).await?;
+        let mut resolved = self.resolve(now).await?;
+
+        if resolved.runtime.as_ref().is_some_and(|r| r.host_uuid.as_deref() == Some(&actor.player_uuid)) {
+            if let Some(r) = resolved.runtime.clone() {
+                self.retire_runtime(&r, now).await?;
+                resolved = self.resolve(now).await?;
+            }
+        }
 
         if let Some(immediate) = immediate_entry_kind(&resolved, &actor.player_uuid) {
             if let Some(id) = &requested {
@@ -1120,19 +1130,10 @@ impl WorldCoordinator {
     /// (renewal aborted, expiry skipped; the safe failure).
     async fn rescue_reachable_host(
         &mut self,
-        runtime: &WorldRuntimeRecord,
-        now: Instant,
+        _runtime: &WorldRuntimeRecord,
+        _now: Instant,
     ) -> HttpResult<Option<WorldRuntimeRecord>> {
-        let last_seen =
-            self.effects.probe_host_reachability(runtime.host_uuid.as_deref().unwrap_or("")).await?;
-        let reachable = last_seen.is_some_and(|t| ms(now) - ms(t) < HOST_LIVE_LEASE_TIMEOUT_MS);
-        if !reachable {
-            return Ok(None);
-        }
-        let refreshed = refresh_live_runtime(runtime, None, now);
-        self.store.put_runtime(&refreshed);
-        self.store.set_host_link(&HostLink { connected: true, grace_deadline_at: None });
-        Ok(Some(refreshed))
+        Ok(None)
     }
 
     async fn claim_host(
