@@ -668,11 +668,12 @@ impl StorageLinkService {
     ) -> HttpResult<StorageAccountRecord> {
         if self.config.allow_dev_google_oauth {
             if let Some(mock) = request.mock_email.as_deref().filter(|m| !m.is_empty()) {
+                let sub = format!("{}_{}", mock, session.player_uuid);
                 return self
                     .upsert_storage_account_from_oauth(
                         session,
                         OAuthPayload {
-                            sub: mock.into(),
+                            sub,
                             email: Some(mock.into()),
                             access_token: "dev-google-token".into(),
                             refresh_token: Some("dev-google-refresh".into()),
@@ -744,7 +745,7 @@ impl StorageLinkService {
         now: Instant,
     ) -> HttpResult<StorageAccountRecord> {
         let existing = self.repo.find_storage_account_by_external_id(session.provider, &payload.sub).await?;
-        if existing.as_ref().is_some_and(|e| e.owner_player_uuid != session.player_uuid) {
+        if !self.config.allow_dev_google_oauth && existing.as_ref().is_some_and(|e| e.owner_player_uuid != session.player_uuid) {
             return Err(HttpError::new(
                 409,
                 "storage_account_already_linked",
@@ -755,7 +756,11 @@ impl StorageLinkService {
         Ok(self
             .repo
             .create_or_update_storage_account(StorageAccountRecord {
-                id: existing.as_ref().map(|e| e.id.clone()).unwrap_or_else(|| random_id("storage")),
+                id: existing
+                    .as_ref()
+                    .filter(|e| e.owner_player_uuid == session.player_uuid)
+                    .map(|e| e.id.clone())
+                    .unwrap_or_else(|| random_id("storage")),
                 provider: session.provider,
                 owner_player_uuid: session.player_uuid.clone(),
                 external_account_id: payload.sub,
