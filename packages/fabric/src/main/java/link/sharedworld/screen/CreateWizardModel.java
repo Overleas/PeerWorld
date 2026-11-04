@@ -26,7 +26,7 @@ final class CreateWizardModel {
     }
 
     private StorageState storageState = StorageState.CHECKING;
-    private Step step = Step.CONNECT_DRIVE;
+    private Step step = Step.PICK_WORLD;
 
     Step step() {
         return this.step;
@@ -42,7 +42,7 @@ final class CreateWizardModel {
 
     /** True while the wizard must show the connect step before anything else. */
     boolean connectStepRequired() {
-        return !this.storageSatisfied();
+        return false;
     }
 
     /**
@@ -93,7 +93,7 @@ final class CreateWizardModel {
         return switch (this.step) {
             case CONNECT_DRIVE -> false;
             case PICK_WORLD -> saveSelected;
-            case DETAILS -> saveSelected && nameValid && this.storageSatisfied();
+            case DETAILS -> saveSelected && nameValid;
         };
     }
 
@@ -118,10 +118,6 @@ final class CreateWizardModel {
     boolean back() {
         if (this.step == Step.DETAILS) {
             this.step = Step.PICK_WORLD;
-            return true;
-        }
-        if (this.step == Step.PICK_WORLD && this.connectStepRequired()) {
-            this.step = Step.CONNECT_DRIVE;
             return true;
         }
         return false;

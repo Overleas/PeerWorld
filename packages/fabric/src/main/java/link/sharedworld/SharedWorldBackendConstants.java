@@ -6,7 +6,7 @@ final class SharedWorldBackendConstants {
      * Cloudflare worker address, which keeps serving them as a forwarder to
      * this host; the worker also stays the download relay for everyone.
      */
-    static final String DEFAULT_BASE_URL = "https://sudden-brunswick-lol-bishop.trycloudflare.com";
+    static final String DEFAULT_BASE_URL = "https://sharedworld-server.onrender.com";
     static final String BACKEND_URL_SYSTEM_PROPERTY = "sharedworld.backendUrl";
 
     private SharedWorldBackendConstants() {

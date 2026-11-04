@@ -59,11 +59,8 @@ public final class SharedWorldClientConfigStore {
         if (override != null) {
             return override;
         }
-        if (isLocalServerReachable()) {
-            return "http://127.0.0.1:8787";
-        }
         String configured = normalizeBaseUrl(this.state.backend.baseUrl);
-        if (configured != null && !configured.contains("api.sharedworld.net") && !configured.contains("127.0.0.1") && !configured.contains("localhost")) {
+        if (configured != null && !configured.contains("api.sharedworld.net")) {
             return configured;
         }
         return configuredBackendBaseUrl();

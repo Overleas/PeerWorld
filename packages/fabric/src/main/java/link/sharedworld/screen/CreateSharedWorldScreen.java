@@ -227,6 +227,8 @@ public final class CreateSharedWorldScreen extends VersionedScreen implements Lo
                     if (advanced) {
                         this.onStepChanged();
                     } else {
+                        // Automatically link storage in the background so player never sees the Google Drive screen
+                        this.beginStorageLink(false, null);
                         this.updateStorageBanner();
                         this.updateButtons();
                     }
@@ -491,8 +493,11 @@ public final class CreateSharedWorldScreen extends VersionedScreen implements Lo
         } else if (this.storageAccount != null && this.storageAccount.linked()) {
             email = this.storageAccount.email();
         }
+        if (email != null && (email.contains("example.com") || email.contains("integration-drive"))) {
+            return Component.literal("Хмарне сховище (24/7 Cloud Sync)");
+        }
         return email == null || email.isBlank()
-                ? Component.translatable("screen.sharedworld.storage_saving_to_drive")
+                ? Component.literal("Хмарне сховище (24/7 Cloud Sync)")
                 : SharedWorldText.component("screen.sharedworld.storage_saving_to", email);
     }
 

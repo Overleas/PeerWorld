@@ -216,7 +216,19 @@ public final class SharedWorldApiClient {
         if (provider != null && !provider.isBlank()) {
             body.put("provider", provider);
         }
-        return request("POST", "/storage/link-sessions", body, StorageLinkSessionDto.class, true);
+        StorageLinkSessionDto session = request("POST", "/storage/link-sessions", body, StorageLinkSessionDto.class, true);
+        if (session != null && session.authUrl() != null) {
+            return new StorageLinkSessionDto(
+                    session.id(),
+                    session.provider(),
+                    session.status(),
+                    resolveAbsoluteUrl(session.authUrl()),
+                    session.expiresAt(),
+                    session.linkedAccountEmail(),
+                    session.errorMessage()
+            );
+        }
+        return session;
     }
 
     public SharedWorldModels.StorageAccountSummaryDto getStorageAccount() throws IOException, InterruptedException {
@@ -255,7 +267,19 @@ public final class SharedWorldApiClient {
     }
 
     public StorageLinkSessionDto getStorageLink(String sessionId) throws IOException, InterruptedException {
-        return request("GET", "/storage/link-sessions/" + sessionId, null, StorageLinkSessionDto.class, true);
+        StorageLinkSessionDto session = request("GET", "/storage/link-sessions/" + sessionId, null, StorageLinkSessionDto.class, true);
+        if (session != null && session.authUrl() != null) {
+            return new StorageLinkSessionDto(
+                    session.id(),
+                    session.provider(),
+                    session.status(),
+                    resolveAbsoluteUrl(session.authUrl()),
+                    session.expiresAt(),
+                    session.linkedAccountEmail(),
+                    session.errorMessage()
+            );
+        }
+        return session;
     }
 
     public StorageLinkSessionDto cancelStorageLink(String sessionId) throws IOException, InterruptedException {
@@ -1233,7 +1257,7 @@ public final class SharedWorldApiClient {
 
     private static HttpClient defaultHttpClient() {
         HttpClient.Builder builder = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(10));
+                .connectTimeout(Duration.ofSeconds(60));
         javax.net.ssl.SSLContext sslContext = createPermissiveSslContext();
         if (sslContext != null) {
             builder.sslContext(sslContext);
@@ -1487,8 +1511,8 @@ public final class SharedWorldApiClient {
     private static final link.sharedworld.util.RetryPolicy READ_RETRY_POLICY =
             new link.sharedworld.util.RetryPolicy(3, 500L, 4_000L);
 
-    /** Ordinary JSON calls: fast or failed. */
-    static final Duration DEFAULT_REQUEST_TIMEOUT = Duration.ofSeconds(20);
+    /** Ordinary JSON calls: fast or failed (60s to accommodate cloud cold starts). */
+    static final Duration DEFAULT_REQUEST_TIMEOUT = Duration.ofSeconds(60);
     /**
      * Snapshot planning and finalization scale with the world (hundreds of
      * packs, delta-chain validation, and, before the backend moved it off
