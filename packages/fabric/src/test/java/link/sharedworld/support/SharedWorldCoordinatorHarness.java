@@ -389,6 +389,7 @@ public final class SharedWorldCoordinatorHarness {
         private boolean renderThread = true;
         private Screen currentScreen;
         private link.sharedworld.SharedWorldPlaySessionTracker.ActiveWorldSession currentPlaySession;
+        private link.sharedworld.SharedWorldPlaySessionTracker.RecoverySession pendingRecoverySession;
         private final List<String> actions = new ArrayList<>();
         private final Deque<Runnable> renderThreadTasks = new ArrayDeque<>();
         private int disconnectCalls;
@@ -492,6 +493,17 @@ public final class SharedWorldCoordinatorHarness {
 
         public void setCurrentPlaySession(link.sharedworld.SharedWorldPlaySessionTracker.ActiveWorldSession session) {
             this.currentPlaySession = session;
+        }
+
+        @Override
+        public link.sharedworld.SharedWorldPlaySessionTracker.RecoverySession consumePendingRecovery() {
+            var session = this.pendingRecoverySession;
+            this.pendingRecoverySession = null;
+            return session;
+        }
+
+        public void setPendingRecoverySession(link.sharedworld.SharedWorldPlaySessionTracker.RecoverySession session) {
+            this.pendingRecoverySession = session;
         }
 
         public void setLocalServerState(boolean hasSingleplayerServer, boolean hasLevel, boolean localServer) {

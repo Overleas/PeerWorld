@@ -419,6 +419,41 @@ public final class SharedWorldSessionCoordinator {
 
     public boolean openRecoveryScreenIfPresent(Screen fallbackParent) {
         SharedWorldRecoveryStore.RecoveryRecord record = this.recoveryStore.load();
+        if (record == null) {
+            SharedWorldPlaySessionTracker.RecoverySession pending = this.clientShell.consumePendingRecovery();
+            if (pending != null) {
+                record = new SharedWorldRecoveryStore.RecoveryRecord(
+                        pending.worldId(),
+                        pending.worldName(),
+                        pending.runtimeEpoch(),
+                        "disconnect-recovery",
+                        pending.previousJoinTarget(),
+                        null
+                );
+                try {
+                    savePersistedRecovery(record);
+                } catch (Exception exception) {
+                    LOGGER.warn("SharedWorld could not persist pending recovery record for {}", pending.worldId(), exception);
+                }
+            } else {
+                SharedWorldPlaySessionTracker.ActiveWorldSession current = this.clientShell.currentPlaySession();
+                if (current != null && current.role() == SharedWorldPlaySessionTracker.SessionRole.GUEST) {
+                    record = new SharedWorldRecoveryStore.RecoveryRecord(
+                            current.worldId(),
+                            current.worldName(),
+                            current.runtimeEpoch(),
+                            "disconnect-recovery",
+                            current.joinTarget(),
+                            null
+                    );
+                    try {
+                        savePersistedRecovery(record);
+                    } catch (Exception exception) {
+                        LOGGER.warn("SharedWorld could not persist active recovery record for {}", current.worldId(), exception);
+                    }
+                }
+            }
+        }
         if (record == null || isRecoverySuppressed(record)) {
             return false;
         }
@@ -449,7 +484,9 @@ public final class SharedWorldSessionCoordinator {
         RecoveryFingerprint fingerprint = fingerprint(record);
         this.suppressedRecoveryFingerprint = fingerprint;
         if (!resumesThroughWaiting(record)) {
-            this.clientShell.setScreen(this.sessionUi.waiting(parent, record.worldId(), record.worldName(), null));
+            if (parent != null) {
+                this.clientShell.setScreen(this.sessionUi.waiting(parent, record.worldId(), record.worldName(), null));
+            }
             beginJoinAttempt(
                     parent,
                     record.worldId(),
@@ -502,6 +539,11 @@ public final class SharedWorldSessionCoordinator {
         if ("connect".equals(result.action())) {
             String target = result.runtime() != null ? result.runtime().joinTarget() : null;
             if (target != null && !target.isBlank()) {
+                if (previousJoinTarget != null && !previousJoinTarget.isBlank() && target.equalsIgnoreCase(previousJoinTarget)) {
+                    LOGGER.info("SharedWorld enterSession returned previous join target ({}); old host has not departed yet, remaining in waiting flow.", target);
+                    startWaitingFlow(parent, result.world().id(), worldName, ownerUuid, previousJoinTarget, result.waiterSessionId(), hostChangeFlow, returnToSharedWorldMenu, automaticTakeover);
+                    return;
+                }
                 String hostVersion = result.runtime().hostMinecraftVersion();
                 String localVersion = link.sharedworld.versioned.ClientCompat.currentMinecraftVersion();
                 if (link.sharedworld.host.WorldVersionGatePolicy.decideGuestJoin(hostVersion, localVersion)
@@ -599,6 +641,7 @@ public final class SharedWorldSessionCoordinator {
     private void startWaitingFlow(Screen parent, String worldId, String worldName, String ownerUuid, String previousJoinTarget, String waiterSessionId, boolean hostChangeFlow, boolean returnToSharedWorldMenu, boolean automaticTakeover) {
         this.waitingState = new WaitingFlowState(++this.joinAttemptCounter, parent, worldId, worldName, ownerUuid, previousJoinTarget, waiterSessionId, hostChangeFlow, returnToSharedWorldMenu, automaticTakeover);
         this.waitingState.waitingStartedAt = this.clock.nowMillis();
+        this.waitingState.lastPollAt = this.clock.nowMillis();
         this.waitingState.progressState = progress(hostChangeFlow, Component.translatable("screen.sharedworld.progress.waiting_for_host"), null);
         if (waiterSessionId != null && !waiterSessionId.isBlank()) {
             try {
@@ -612,6 +655,19 @@ public final class SharedWorldSessionCoordinator {
                 ));
             } catch (Exception exception) {
                 LOGGER.warn("SharedWorld could not persist the waiting recovery record for {}", worldId, exception);
+            }
+        } else if (previousJoinTarget != null && !previousJoinTarget.isBlank()) {
+            try {
+                savePersistedRecovery(new SharedWorldRecoveryStore.RecoveryRecord(
+                        worldId,
+                        worldName,
+                        0L,
+                        "disconnect-recovery",
+                        previousJoinTarget,
+                        null
+                ));
+            } catch (Exception exception) {
+                LOGGER.warn("SharedWorld could not persist the disconnect recovery record for {}", worldId, exception);
             }
         }
         this.clientShell.setScreen(this.sessionUi.waiting(parent, worldId, worldName, ownerUuid));
@@ -681,6 +737,12 @@ public final class SharedWorldSessionCoordinator {
         }
         switch (decision.outcome()) {
             case CONNECT -> {
+                if (state.previousJoinTarget != null && !state.previousJoinTarget.isBlank()
+                        && decision.connectTarget() != null
+                        && decision.connectTarget().equalsIgnoreCase(state.previousJoinTarget)) {
+                    LOGGER.info("SharedWorld observeWaiting returned previous join target ({}); remaining in waiting flow.", decision.connectTarget());
+                    return;
+                }
                 this.waitingState = null;
                 clearPersistedRecovery();
                 beginConnectHandoff(state.parent, state.worldId, state.worldName, decision.runtimeEpoch(), decision.connectTarget(), null);

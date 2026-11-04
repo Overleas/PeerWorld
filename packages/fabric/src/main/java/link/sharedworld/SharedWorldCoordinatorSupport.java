@@ -47,6 +47,10 @@ public final class SharedWorldCoordinatorSupport {
             return null;
         }
 
+        default SharedWorldPlaySessionTracker.RecoverySession consumePendingRecovery() {
+            return null;
+        }
+
         /**
          * Whether the open singleplayer server is running a SharedWorld-managed world.
          * Fails closed ([P9]): a shell that cannot tell must treat the world as
@@ -166,6 +170,11 @@ public final class SharedWorldCoordinatorSupport {
             @Override
             public SharedWorldPlaySessionTracker.ActiveWorldSession currentPlaySession() {
                 return SharedWorldClient.playSessionTracker().currentSession();
+            }
+
+            @Override
+            public SharedWorldPlaySessionTracker.RecoverySession consumePendingRecovery() {
+                return SharedWorldClient.playSessionTracker().consumePendingRecovery();
             }
 
             @Override
