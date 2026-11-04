@@ -381,5 +381,8 @@
   "screen.sharedworld.env_backup_note": "If something goes wrong, you can restore an older backup from the world's settings.",
   "screen.sharedworld.env_host": "Host anyway",
   "screen.sharedworld.env_cancel": "Cancel",
-  "screen.sharedworld.env_countdown": "Cancelling in %ss..."
+  "screen.sharedworld.env_countdown": "Cancelling in %ss...",
+  "screen.sharedworld.allow_offline_on": "Allow Offline/Cracked Players: ON",
+  "screen.sharedworld.allow_offline_off": "Allow Offline/Cracked Players: OFF",
+  "screen.sharedworld.cloud_storage_status_connected": "Cloud Storage: Connected (24/7 Render Cloud)"
 }

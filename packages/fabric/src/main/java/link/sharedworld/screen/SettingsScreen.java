@@ -97,14 +97,14 @@ public final class SettingsScreen extends link.sharedworld.versioned.VersionedSc
         this.savedAllowOffline = link.sharedworld.SharedWorldClientConfigStore.shared().allowOfflinePlayers();
         this.currentAllowOffline = this.savedAllowOffline;
         this.toggleOfflineButton = Button.builder(
-                Component.literal("Allow Offline/Cracked Players: " + (this.currentAllowOffline ? "ON" : "OFF")),
+                this.offlineButtonMessage(),
                 button -> {
                     this.currentAllowOffline = !this.currentAllowOffline;
-                    button.setMessage(Component.literal("Allow Offline/Cracked Players: " + (this.currentAllowOffline ? "ON" : "OFF")));
+                    button.setMessage(this.offlineButtonMessage());
                     this.updateButtons();
                 }
-        ).width(220).build();
-        this.customJoinBox = new EditBox(this.font, 0, 0, 220, 20, Component.translatable("screen.sharedworld.custom_join_address"));
+        ).width(260).build();
+        this.customJoinBox = new EditBox(this.font, 0, 0, 260, 20, Component.translatable("screen.sharedworld.custom_join_address"));
         this.customJoinBox.setMaxLength(260);
         this.customJoinBox.setHint(SharedWorldText.hint("screen.sharedworld.custom_join_address_hint"));
         this.customJoinBox.setValue(this.savedCustomJoinAddress);
@@ -216,10 +216,18 @@ public final class SettingsScreen extends link.sharedworld.versioned.VersionedSc
         return Component.literal(this.font.plainSubstrByWidth(plain, maxWidth - this.font.width("...")) + "...");
     }
 
+    private Component offlineButtonMessage() {
+        return Component.translatable(
+                this.currentAllowOffline
+                        ? "screen.sharedworld.allow_offline_on"
+                        : "screen.sharedworld.allow_offline_off"
+        );
+    }
+
     private void renderAdvancedDecorations(GuiGraphics guiGraphics) {
         int left = this.customJoinBox.getX();
         int textWidth = Math.min(320, this.contentArea.width() - 76);
-        guiGraphics.drawString(this.font, Component.translatable("screen.sharedworld.custom_join_address"), left, this.contentArea.top() + 12, 0xFFA0A0A0);
+        guiGraphics.drawString(this.font, Component.translatable("screen.sharedworld.custom_join_address"), left, this.customJoinBox.getY() - 12, 0xFFA0A0A0);
         int textTop = link.sharedworld.versioned.WidgetCompat.bottom(this.customJoinBox) + 6;
         if (!this.isAdvancedValid()) {
             guiGraphics.drawString(this.font, Component.translatable("screen.sharedworld.custom_join_address_invalid"), left, textTop, 0xFFFF5555);
@@ -423,6 +431,9 @@ public final class SettingsScreen extends link.sharedworld.versioned.VersionedSc
                 return Component.translatable(this.notLinkedKey);
             }
             String who = this.account.email() != null ? this.account.email() : "?";
+            if (who.contains("example.com") || who.contains("integration-drive")) {
+                return Component.translatable("screen.sharedworld.cloud_storage_status_connected");
+            }
             return Component.translatable(this.account.healthy() ? this.linkedKey : this.linkedUnhealthyKey, who);
         }
 
@@ -534,9 +545,12 @@ public final class SettingsScreen extends link.sharedworld.versioned.VersionedSc
 
         @Override
         public void doLayout(ScreenRectangle area) {
-            SettingsScreen.this.customJoinBox.setWidth(Math.min(220, area.width() - 76));
-            SettingsScreen.this.customJoinBox.setPosition(SettingsScreen.this.width / 2 - SettingsScreen.this.customJoinBox.getWidth() / 2, area.top() + 24);
-            SettingsScreen.this.toggleOfflineButton.setPosition(SettingsScreen.this.width / 2 - 110, area.top() + 54);
+            int centerX = SettingsScreen.this.width / 2;
+            int boxWidth = Math.min(260, area.width() - 76);
+            SettingsScreen.this.toggleOfflineButton.setWidth(boxWidth);
+            SettingsScreen.this.toggleOfflineButton.setPosition(centerX - boxWidth / 2, area.top() + 12);
+            SettingsScreen.this.customJoinBox.setWidth(boxWidth);
+            SettingsScreen.this.customJoinBox.setPosition(centerX - boxWidth / 2, area.top() + 58);
         }
     }
 }
