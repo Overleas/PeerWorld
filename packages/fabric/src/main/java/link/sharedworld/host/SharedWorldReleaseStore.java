@@ -13,7 +13,7 @@ public final class SharedWorldReleaseStore implements SharedWorldReleaseCoordina
     private final Path file;
 
     public SharedWorldReleaseStore() {
-        this(link.sharedworld.platform.SharedWorldPlatform.get().configDir().resolve("sharedworld-release.json"));
+        this(link.sharedworld.platform.SharedWorldPlatform.get().resolveConfigFile("release"));
     }
 
     SharedWorldReleaseStore(Path file) {

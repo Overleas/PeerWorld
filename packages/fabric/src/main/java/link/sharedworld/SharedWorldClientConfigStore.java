@@ -208,7 +208,7 @@ public final class SharedWorldClientConfigStore {
 
     private static final class Holder {
         private static final SharedWorldClientConfigStore INSTANCE = new SharedWorldClientConfigStore(
-                link.sharedworld.platform.SharedWorldPlatform.get().configDir().resolve("sharedworld-client.json")
+                link.sharedworld.platform.SharedWorldPlatform.get().resolveConfigFile("client")
         );
     }
 

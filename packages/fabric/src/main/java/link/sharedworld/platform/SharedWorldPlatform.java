@@ -17,6 +17,24 @@ import java.util.Optional;
 public interface SharedWorldPlatform {
     Path configDir();
 
+    default Path resolveConfigFile(String baseName) {
+        Path dir = configDir();
+        Path modern = dir.resolve("peerworld-" + baseName + ".json");
+        if (java.nio.file.Files.exists(modern)) {
+            return modern;
+        }
+        Path legacy = dir.resolve("sharedworld-" + baseName + ".json");
+        if (java.nio.file.Files.exists(legacy)) {
+            try {
+                java.nio.file.Files.copy(legacy, modern);
+                return modern;
+            } catch (Exception ignored) {
+                return legacy;
+            }
+        }
+        return modern;
+    }
+
     boolean isModLoaded(String modId);
 
     Optional<String> modVersion(String modId);

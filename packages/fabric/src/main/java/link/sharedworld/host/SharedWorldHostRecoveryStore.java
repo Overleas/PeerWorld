@@ -16,7 +16,7 @@ public final class SharedWorldHostRecoveryStore implements SharedWorldHostingMan
     private final Path file;
 
     public SharedWorldHostRecoveryStore() {
-        this(link.sharedworld.platform.SharedWorldPlatform.get().configDir().resolve("sharedworld-host-recovery.json"));
+        this(link.sharedworld.platform.SharedWorldPlatform.get().resolveConfigFile("host-recovery"));
     }
 
     SharedWorldHostRecoveryStore(Path file) {

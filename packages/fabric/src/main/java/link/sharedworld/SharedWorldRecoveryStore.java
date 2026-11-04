@@ -13,7 +13,7 @@ public final class SharedWorldRecoveryStore implements SharedWorldSessionCoordin
     private final Path file;
 
     public SharedWorldRecoveryStore() {
-        this(link.sharedworld.platform.SharedWorldPlatform.get().configDir().resolve("sharedworld-recovery.json"));
+        this(link.sharedworld.platform.SharedWorldPlatform.get().resolveConfigFile("recovery"));
     }
 
     SharedWorldRecoveryStore(Path file) {

@@ -16,7 +16,7 @@ import java.util.Map;
 
 public final class SharedWorldListState {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final Path FILE = link.sharedworld.platform.SharedWorldPlatform.get().configDir().resolve("sharedworld-worlds.json");
+    private static final Path FILE = link.sharedworld.platform.SharedWorldPlatform.get().resolveConfigFile("worlds");
 
     private State state = load();
 

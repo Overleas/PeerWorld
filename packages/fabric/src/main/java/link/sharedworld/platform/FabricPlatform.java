@@ -44,7 +44,7 @@ public final class FabricPlatform implements SharedWorldPlatform {
                 .map(ModContainer::getMetadata)
                 .filter(metadata -> !"builtin".equals(metadata.getType()))
                 .filter(metadata -> metadata.getEnvironment().matches(EnvType.SERVER))
-                .filter(metadata -> !metadata.getId().startsWith("sharedworld") && !metadata.getId().startsWith("fabric-"))
+                .filter(metadata -> !metadata.getId().startsWith("peerworld") && !metadata.getId().startsWith("sharedworld") && !metadata.getId().startsWith("fabric-"))
                 .sorted(Comparator.comparing(ModMetadata::getId))
                 .map(metadata -> new HostModDto(metadata.getId(), metadata.getName()))
                 .toList();

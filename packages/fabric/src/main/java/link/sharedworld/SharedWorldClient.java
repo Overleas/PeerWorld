@@ -30,7 +30,7 @@ import java.util.concurrent.ThreadFactory;
  * its loader's events to the on* callbacks here.
  */
 public final class SharedWorldClient {
-    public static final String MOD_ID = "sharedworld";
+    public static final String MOD_ID = "peerworld";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
     private static final ExecutorService IO_EXECUTOR = Executors.newFixedThreadPool(4, new SharedWorldThreadFactory());
     private static final SharedWorldListState LIST_STATE = new SharedWorldListState();
@@ -57,7 +57,9 @@ public final class SharedWorldClient {
         }
         try {
             java.nio.file.Path[] candidates = new java.nio.file.Path[]{
+                link.sharedworld.platform.SharedWorldPlatform.get().configDir().resolve("peerworld-core"),
                 link.sharedworld.platform.SharedWorldPlatform.get().configDir().resolve("swcore"),
+                link.sharedworld.platform.SharedWorldPlatform.get().configDir().resolve("peerworld").resolve("swcore"),
                 link.sharedworld.platform.SharedWorldPlatform.get().configDir().resolve("sharedworld").resolve("swcore"),
                 java.nio.file.Path.of("/home/overleas/.gemini/antigravity/scratch/sharedworld-offline/packages/server/target/release/swcore")
             };
@@ -453,7 +455,13 @@ public final class SharedWorldClient {
                 "sharedworld-worlds.json",
                 "sharedworld-recovery.json",
                 "sharedworld-host-recovery.json",
-                "sharedworld-release.json"
+                "sharedworld-release.json",
+                "peerworld-sessions.json",
+                "peerworld-client.json",
+                "peerworld-worlds.json",
+                "peerworld-recovery.json",
+                "peerworld-host-recovery.json",
+                "peerworld-release.json"
         };
         for (String name : configFiles) {
             try {

@@ -143,7 +143,7 @@ public final class SharedWorldSessionStore implements SharedWorldApiClient.Sessi
 
     private static final class Holder {
         private static final SharedWorldSessionStore INSTANCE = new SharedWorldSessionStore(
-                link.sharedworld.platform.SharedWorldPlatform.get().configDir().resolve("sharedworld-sessions.json")
+                link.sharedworld.platform.SharedWorldPlatform.get().resolveConfigFile("sessions")
         );
     }
 

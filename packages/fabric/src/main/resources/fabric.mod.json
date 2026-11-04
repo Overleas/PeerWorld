@@ -1,13 +1,14 @@
 {
   "schemaVersion": 1,
-  "id": "sharedworld",
+  "id": "peerworld",
   "version": "${version}",
-  "name": "SharedWorld",
-  "description": "Cloud-backed friend-hosted Minecraft worlds powered by e4mc.",
+  "name": "PeerWorld",
+  "description": "Free, decentralized peer-to-peer friend-hosted Minecraft worlds with seamless handoff and offline support.",
   "authors": [
-    "Bolido"
+    "Overleas",
+    "PeerWorld Contributors"
   ],
-  "icon": "share_world_pixel_art.png",
+  "icon": "peerworld_icon.png",
   "environment": "client",
   "entrypoints": {
     "client": [
@@ -17,6 +18,9 @@
   "mixins": [
     "sharedworld.mixins.json",
     "sharedworld-versioned.mixins.json"
+  ],
+  "provides": [
+    "sharedworld"
   ],
   "depends": {
     "fabricloader": ">=0.18.2",
