@@ -45,12 +45,46 @@ final class SharedWorldWaitingFlowLogic {
 
     private static Component progressLabelFor(WorldRuntimeStatusDto runtime) {
         if (runtime != null && runtime.startupProgress() != null) {
-            return Component.literal(runtime.startupProgress().label());
+            String label = runtime.startupProgress().label();
+            if (label != null && !label.isBlank()) {
+                return localizeProgressLabel(label);
+            }
         }
         if (runtime != null && "host-finalizing".equals(runtime.phase())) {
             return Component.translatable("screen.sharedworld.progress.finalizing_previous_host");
         }
         return Component.translatable("screen.sharedworld.progress.waiting_for_host");
+    }
+
+    private static Component localizeProgressLabel(String label) {
+        String normalized = label.trim().toLowerCase();
+        return switch (normalized) {
+            case "uploading the world", "screen.sharedworld.progress.uploading_world", "release_preparing", "release_finishing" ->
+                    Component.translatable("screen.sharedworld.progress.uploading_world");
+            case "preparing world", "screen.sharedworld.progress.preparing_world", "preparing_world" ->
+                    Component.translatable("screen.sharedworld.progress.preparing_world");
+            case "finishing up", "screen.sharedworld.progress.finishing_up", "finishing_up" ->
+                    Component.translatable("screen.sharedworld.progress.finishing_up");
+            case "becoming the host", "screen.sharedworld.progress.becoming_host", "becoming_host" ->
+                    Component.translatable("screen.sharedworld.progress.becoming_host");
+            case "connecting", "screen.sharedworld.progress.connecting" ->
+                    Component.translatable("screen.sharedworld.progress.connecting");
+            case "saving world...", "saving world", "screen.sharedworld.progress.saving_world", "saving_world" ->
+                    Component.translatable("screen.sharedworld.progress.saving_world");
+            case "leaving world...", "leaving world", "screen.sharedworld.progress.leaving_world", "leaving_world" ->
+                    Component.translatable("screen.sharedworld.progress.leaving_world");
+            case "downloading the world", "screen.sharedworld.progress.syncing_world", "syncing_world" ->
+                    Component.translatable("screen.sharedworld.progress.syncing_world");
+            case "recovering your world", "screen.sharedworld.progress.recovering_local_world", "recovering_local_world" ->
+                    Component.translatable("screen.sharedworld.progress.recovering_local_world");
+            case "uploading unsaved changes from your last session", "screen.sharedworld.progress.uploading_local_changes", "uploading_local_changes" ->
+                    Component.translatable("screen.sharedworld.progress.uploading_local_changes");
+            case "waiting for the host", "screen.sharedworld.progress.waiting_for_host", "handoff_wait" ->
+                    Component.translatable("screen.sharedworld.progress.waiting_for_host");
+            case "waiting for the previous host to finish saving", "screen.sharedworld.progress.finalizing_previous_host", "finalizing_previous_host" ->
+                    Component.translatable("screen.sharedworld.progress.finalizing_previous_host");
+            default -> Component.literal(label);
+        };
     }
 
     private static String statusMessageFor(boolean hostChangeFlow, WorldRuntimeStatusDto runtime) {

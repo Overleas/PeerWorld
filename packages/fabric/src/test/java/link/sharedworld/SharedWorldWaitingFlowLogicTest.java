@@ -42,4 +42,21 @@ final class SharedWorldWaitingFlowLogicTest {
                 decision.errorMessage()
         );
     }
+
+    @Test
+    void relaysProgressLabelLocalized() {
+        SharedWorldWaitingFlowLogic.PollDecision decision = SharedWorldWaitingFlowLogic.evaluateObservation(
+                true,
+                new ObserveWaitingResponseDto(
+                        "wait",
+                        new WorldRuntimeStatusDto("world-1", "host-finalizing", 8L, "player-host", "Host", null, null, null, null, null, null,
+                                new link.sharedworld.api.SharedWorldModels.StartupProgressDto("Uploading the world", "indeterminate", null, null)),
+                        null,
+                        "waiter-1"
+                )
+        );
+
+        assertEquals(SharedWorldWaitingFlowLogic.Outcome.STAY_WAITING, decision.outcome());
+        assertEquals("screen.sharedworld.progress.uploading_world", ((net.minecraft.network.chat.contents.TranslatableContents) decision.progressLabel().getContents()).getKey());
+    }
 }
