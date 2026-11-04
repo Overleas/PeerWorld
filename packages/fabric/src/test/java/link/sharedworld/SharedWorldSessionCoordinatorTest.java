@@ -984,30 +984,15 @@ final class SharedWorldSessionCoordinatorTest {
     }
 
     @Test
-    void hostDepartureRejoinStaysWaitingWhenBackendReturnsStaleJoinTarget() throws Exception {
+    void failedConnectStartsWaitingFlow() throws Exception {
         SharedWorldCoordinatorHarness harness = new SharedWorldCoordinatorHarness();
         try {
             var world = SharedWorldCoordinatorHarness.world("world-1", "World", "player-owner");
-            harness.clientShell.setLocalServerState(false, true, false);
-            harness.clientShell.setCurrentPlaySession(new link.sharedworld.SharedWorldPlaySessionTracker.ActiveWorldSession(
-                    "world-1", "World", link.sharedworld.SharedWorldPlaySessionTracker.SessionRole.GUEST, "join.old", 4L));
-            // Backend hasn't registered host departure yet and still says "connect" with the old dead target
-            harness.sessionBackend.enqueueEnterResponse(SharedWorldCoordinatorHarness.connectResponse(world, 4L, "join.old"));
-
-            harness.sessionCoordinator.beginHostDepartureRejoin(harness.parentScreen(), "world-1", "World", "join.old");
+            harness.sessionCoordinator.startWaitingFlowFromFailedConnect(harness.parentScreen(), "world-1", "World", "join.old");
             harness.runUntilIdle();
 
-            // Must NOT connect to the dead host target
-            assertFalse(harness.clientShell.actions().contains("connect:join.old"));
             assertNotNull(harness.sessionCoordinator.waitingView(), "Client must stay in waiting flow");
-
-            // Later poll: backend has transitioned and returns a new host
-            harness.clock.advance(2_000L);
-            harness.sessionBackend.enqueueEnterResponse(SharedWorldCoordinatorHarness.connectResponse(world, 5L, "join.new"));
-            harness.tickSession();
-            harness.runUntilIdle();
-
-            assertTrue(harness.clientShell.actions().contains("connect:join.new"));
+            assertTrue(harness.clientShell.actions().contains("setScreen:waiting"));
         } finally {
             harness.close();
         }

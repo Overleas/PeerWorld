@@ -417,6 +417,10 @@ public final class SharedWorldSessionCoordinator {
         this.recoveryStore.clear();
     }
 
+    public void startWaitingFlowFromFailedConnect(Screen parent, String worldId, String worldName, String failedJoinTarget) {
+        startWaitingFlow(parent, worldId, worldName, null, failedJoinTarget, null, true, true, false);
+    }
+
     public boolean openRecoveryScreenIfPresent(Screen fallbackParent) {
         SharedWorldRecoveryStore.RecoveryRecord record = this.recoveryStore.load();
         if (record == null) {
@@ -539,11 +543,6 @@ public final class SharedWorldSessionCoordinator {
         if ("connect".equals(result.action())) {
             String target = result.runtime() != null ? result.runtime().joinTarget() : null;
             if (target != null && !target.isBlank()) {
-                if (previousJoinTarget != null && !previousJoinTarget.isBlank() && target.equalsIgnoreCase(previousJoinTarget)) {
-                    LOGGER.info("SharedWorld enterSession returned previous join target ({}); old host has not departed yet, remaining in waiting flow.", target);
-                    startWaitingFlow(parent, result.world().id(), worldName, ownerUuid, previousJoinTarget, result.waiterSessionId(), hostChangeFlow, returnToSharedWorldMenu, automaticTakeover);
-                    return;
-                }
                 String hostVersion = result.runtime().hostMinecraftVersion();
                 String localVersion = link.sharedworld.versioned.ClientCompat.currentMinecraftVersion();
                 if (link.sharedworld.host.WorldVersionGatePolicy.decideGuestJoin(hostVersion, localVersion)

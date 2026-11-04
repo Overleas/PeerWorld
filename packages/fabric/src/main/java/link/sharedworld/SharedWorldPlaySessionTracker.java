@@ -230,6 +230,12 @@ public final class SharedWorldPlaySessionTracker {
         return recoverySession;
     }
 
+    public synchronized PendingGuestSession consumePendingGuestSession() {
+        PendingGuestSession session = this.pendingGuestSession;
+        this.pendingGuestSession = null;
+        return session;
+    }
+
     /** runtimeEpoch is the backend epoch the session connected under; 0 when unknown. */
     public record RecoverySession(String worldId, String worldName, String previousJoinTarget, long runtimeEpoch) {
     }
@@ -238,7 +244,7 @@ public final class SharedWorldPlaySessionTracker {
     public record ActiveWorldSession(String worldId, String worldName, SessionRole role, String joinTarget, long runtimeEpoch) {
     }
 
-    private record PendingGuestSession(String worldId, String worldName, String joinTarget, long runtimeEpoch, long armedAtMillis) {
+    public record PendingGuestSession(String worldId, String worldName, String joinTarget, long runtimeEpoch, long armedAtMillis) {
     }
 
     private record ActiveSession(

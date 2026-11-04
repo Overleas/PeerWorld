@@ -9,6 +9,7 @@
     "E4mcSingleplayerOwnerCompatIntermediaryMixin",
     "E4mcSingleplayerOwnerCompatNamedMixin",
     "IntegratedServerForcedGameTypeMixin",
+    "ServerChatSessionValidationMixin",
     "ServerboundKeyPacketCompatMixin",
     "VanillaBanCommandInterceptMixin",
     "VanillaWhitelistCommandInterceptMixin",
