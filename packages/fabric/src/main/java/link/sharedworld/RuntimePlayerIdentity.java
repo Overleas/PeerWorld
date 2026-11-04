@@ -12,10 +12,17 @@ public final class RuntimePlayerIdentity {
     }
 
     public static String resolveBackendPlayerUuidWithHyphens(User user) {
-        Objects.requireNonNull(user, "user");
+        if (user == null) {
+            return UUID.nameUUIDFromBytes("OfflinePlayer:Player".getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString();
+        }
+        UUID profileId = user.getProfileId();
+        if (profileId == null) {
+            String name = user.getName() != null && !user.getName().isBlank() ? user.getName() : "Player";
+            profileId = UUID.nameUUIDFromBytes(("OfflinePlayer:" + name).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        }
         return resolveBackendPlayerUuidWithHyphens(
                 System.getProperty("sharedworld.devPlayerUuid"),
-                user.getProfileId()
+                profileId
         );
     }
 

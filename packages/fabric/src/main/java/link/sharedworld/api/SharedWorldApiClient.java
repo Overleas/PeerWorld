@@ -1268,10 +1268,10 @@ public final class SharedWorldApiClient {
     private static SessionIdentity resolveSessionIdentity() {
         User user = Minecraft.getInstance().getUser();
         String playerUuid = RuntimePlayerIdentity.resolveBackendPlayerUuidWithHyphens(user);
-        String playerName = System.getProperty("sharedworld.devPlayerName", user.getName());
+        String playerName = System.getProperty("sharedworld.devPlayerName", user != null ? user.getName() : "Player");
         String accessToken = System.getProperty("sharedworld.devAuthSecret") != null
                 ? "dev:" + System.getProperty("sharedworld.devAuthSecret")
-                : user.getAccessToken();
+                : (user != null && user.getAccessToken() != null ? user.getAccessToken() : "0");
         return new SessionIdentity(playerUuid, playerName, accessToken);
     }
 
@@ -1293,7 +1293,7 @@ public final class SharedWorldApiClient {
 
     public static String currentPlayerName() {
         User user = Minecraft.getInstance().getUser();
-        return System.getProperty("sharedworld.devPlayerName", user.getName());
+        return System.getProperty("sharedworld.devPlayerName", user != null ? user.getName() : "Player");
     }
 
     public static boolean isDeletedWorldError(Throwable error) {

@@ -159,7 +159,7 @@ public final class SharedWorldClientConfigStore {
             sanitized.ui = new UiConfig();
         }
         if (sanitized.ui.lastMultiplayerView == null) {
-            sanitized.ui.lastMultiplayerView = MultiplayerView.VANILLA;
+            sanitized.ui.lastMultiplayerView = MultiplayerView.SHAREDWORLD;
         }
         if (sanitized.hosting == null) {
             sanitized.hosting = new HostingConfig();
