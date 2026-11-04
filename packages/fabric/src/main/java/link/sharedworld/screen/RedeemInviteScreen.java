@@ -66,11 +66,27 @@ public final class RedeemInviteScreen extends link.sharedworld.versioned.Version
         if (this.redeemInFlight) {
             return;
         }
-        String code = this.codeBox.getValue().trim().toUpperCase();
-        if (code.isEmpty()) {
+        String raw = this.codeBox.getValue().trim();
+        if (raw.isEmpty()) {
             this.statusMessage = SharedWorldText.string("screen.sharedworld.invite_code_required");
             return;
         }
+        String code = raw;
+        if (raw.contains("@")) {
+            String[] parts = raw.split("@", 2);
+            code = parts[0].trim().toUpperCase();
+            String customUrl = parts[1].trim();
+            if (!customUrl.isEmpty()) {
+                if (!customUrl.startsWith("http://") && !customUrl.startsWith("https://")) {
+                    customUrl = "https://" + customUrl;
+                }
+                link.sharedworld.SharedWorldClientConfigStore.shared().setConfiguredBackendBaseUrl(customUrl);
+                SharedWorldClient.updateBackendBaseUrl(customUrl);
+            }
+        } else {
+            code = code.toUpperCase();
+        }
+        final String finalCode = code;
 
         this.redeemInFlight = true;
         this.doneButton.active = false;
@@ -78,7 +94,7 @@ public final class RedeemInviteScreen extends link.sharedworld.versioned.Version
         CompletableFuture
                 .supplyAsync(() -> {
                     try {
-                        return SharedWorldClient.apiClient().redeemInvite(code);
+                        return SharedWorldClient.apiClient().redeemInvite(finalCode);
                     } catch (Exception exception) {
                         throw new RuntimeException(exception);
                     }

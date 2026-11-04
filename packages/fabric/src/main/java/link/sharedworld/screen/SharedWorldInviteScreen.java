@@ -89,6 +89,23 @@ public final class SharedWorldInviteScreen extends link.sharedworld.versioned.Ve
         super.render(guiGraphics, mouseX, mouseY, partialTick);
     }
 
+    private static String formatFullInviteCode(String code) {
+        String base = link.sharedworld.SharedWorldClientConfigStore.shared().configuredBackendBaseUrl();
+        if (base != null && !base.contains("127.0.0.1") && !base.contains("localhost")) {
+            return code + "@" + base;
+        }
+        try {
+            java.nio.file.Path tunnelFile = java.nio.file.Path.of("/home/overleas/.local/share/sharedworld-tunnel.url");
+            if (java.nio.file.Files.exists(tunnelFile)) {
+                String tunnel = java.nio.file.Files.readString(tunnelFile).trim();
+                if (!tunnel.isBlank()) {
+                    return code + "@" + tunnel;
+                }
+            }
+        } catch (Exception ignored) {}
+        return code;
+    }
+
     private void createInvite() {
         this.actionInFlight = true;
         this.confirmCreateNewCode = false;
@@ -112,7 +129,7 @@ public final class SharedWorldInviteScreen extends link.sharedworld.versioned.Ve
                         ));
                     } else {
                         this.inviteCode = result.code();
-                        this.minecraft.keyboardHandler.setClipboard(result.code());
+                        this.minecraft.keyboardHandler.setClipboard(formatFullInviteCode(result.code()));
                         this.parent.onChildOperationFinished(this.world.id());
                         this.updateButtons();
                     }
@@ -142,7 +159,7 @@ public final class SharedWorldInviteScreen extends link.sharedworld.versioned.Ve
                         ));
                     } else {
                         this.inviteCode = result.invite().code();
-                        this.minecraft.keyboardHandler.setClipboard(result.invite().code());
+                        this.minecraft.keyboardHandler.setClipboard(formatFullInviteCode(result.invite().code()));
                         this.parent.onChildOperationFinished(this.world.id());
                         this.updateButtons();
                     }

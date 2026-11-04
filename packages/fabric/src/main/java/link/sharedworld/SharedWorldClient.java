@@ -102,36 +102,7 @@ public final class SharedWorldClient {
         guestRuntimeWatcher = new SharedWorldGuestRuntimeWatcher(apiClient);
         guestCacheWarmer = new SharedWorldGuestCacheWarmer(apiClient, hostPlayerIdentity);
         sessionCoordinator = new SharedWorldSessionCoordinator(apiClient);
-        pushChannel = new link.sharedworld.realtime.SharedWorldPushChannel(
-                SharedWorldClientConfigStore.shared().resolvedBackendBaseUrl(),
-                new link.sharedworld.realtime.JdkWebSocketConnector(),
-                () -> apiClient.ensureSession().token(),
-                java.util.concurrent.Executors.newSingleThreadScheduledExecutor((runnable) -> {
-                    Thread thread = new Thread(runnable, "sharedworld-realtime");
-                    thread.setDaemon(true);
-                    return thread;
-                }),
-                runnable -> Minecraft.getInstance().execute(runnable),
-                new link.sharedworld.realtime.SharedWorldPushChannel.Listener() {
-                    @Override
-                    public void onConnectionChanged(boolean connected) {
-                        REALTIME_EVENTS.dispatchConnectionChanged(connected);
-                    }
-
-                    @Override
-                    public void onEvent(link.sharedworld.api.SharedWorldModels.RealtimeEventDto event) {
-                        REALTIME_EVENTS.dispatchEvent(event);
-                    }
-                },
-                // Activity gates the reconnect cap: anything session-shaped
-                // (or a recently open SharedWorld screen) keeps reconnects
-                // aggressive; idle at the title screen backs off to minutes.
-                () -> PLAY_SESSION_TRACKER.currentSession() != null
-                        || hostingManager.phase() != link.sharedworld.host.SharedWorldHostingManager.Phase.IDLE
-                        || releaseCoordinator.isActive()
-                        || sessionCoordinator.waitingView() != null
-                        || SharedWorldActivity.screenRecentlyOpen()
-        );
+        pushChannel = createPushChannel(SharedWorldClientConfigStore.shared().resolvedBackendBaseUrl());
         REALTIME_EVENTS.subscribe(guestRuntimeWatcher);
         REALTIME_EVENTS.subscribe(guestCacheWarmer);
         REALTIME_EVENTS.subscribe(presenceManager);
@@ -356,6 +327,53 @@ public final class SharedWorldClient {
 
     public static SharedWorldApiClient apiClient() {
         return apiClient;
+    }
+
+    private static link.sharedworld.realtime.SharedWorldPushChannel createPushChannel(String url) {
+        return new link.sharedworld.realtime.SharedWorldPushChannel(
+                url,
+                new link.sharedworld.realtime.JdkWebSocketConnector(),
+                () -> apiClient.ensureSession().token(),
+                java.util.concurrent.Executors.newSingleThreadScheduledExecutor((runnable) -> {
+                    Thread thread = new Thread(runnable, "sharedworld-realtime");
+                    thread.setDaemon(true);
+                    return thread;
+                }),
+                runnable -> Minecraft.getInstance().execute(runnable),
+                new link.sharedworld.realtime.SharedWorldPushChannel.Listener() {
+                    @Override
+                    public void onConnectionChanged(boolean connected) {
+                        REALTIME_EVENTS.dispatchConnectionChanged(connected);
+                    }
+
+                    @Override
+                    public void onEvent(link.sharedworld.api.SharedWorldModels.RealtimeEventDto event) {
+                        REALTIME_EVENTS.dispatchEvent(event);
+                    }
+                },
+                () -> PLAY_SESSION_TRACKER.currentSession() != null
+                        || (hostingManager != null && hostingManager.phase() != link.sharedworld.host.SharedWorldHostingManager.Phase.IDLE)
+                        || (releaseCoordinator != null && releaseCoordinator.isActive())
+                        || (sessionCoordinator != null && sessionCoordinator.waitingView() != null)
+                        || SharedWorldActivity.screenRecentlyOpen()
+        );
+    }
+
+    public static void updateBackendBaseUrl(String newUrl) {
+        if (newUrl == null || newUrl.isBlank()) {
+            return;
+        }
+        if (apiClient != null) {
+            apiClient.setBaseUrl(newUrl);
+        }
+        if (pushChannel != null) {
+            try {
+                pushChannel.stop();
+            } catch (Exception ignored) {}
+            pushChannel = createPushChannel(newUrl);
+            pushChannelStarted = false;
+            ensureRealtimeStarted();
+        }
     }
 
     /**

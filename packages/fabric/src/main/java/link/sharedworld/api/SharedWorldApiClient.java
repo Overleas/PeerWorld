@@ -58,7 +58,7 @@ import java.util.zip.GZIPInputStream;
 public final class SharedWorldApiClient {
     private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger("sharedworld");
 
-    private final String baseUrl;
+    private volatile String baseUrl;
     private final HttpClient httpClient;
     private final Gson gson;
     private final SessionIdentityProvider sessionIdentityProvider;
@@ -500,14 +500,36 @@ public final class SharedWorldApiClient {
      * account of the bytes. A dead session (provider forgot it) is recreated
      * once and only this artifact restarts.
      */
+    public void setBaseUrl(String baseUrl) {
+        this.baseUrl = Objects.requireNonNull(baseUrl, "baseUrl").replaceAll("/+$", "");
+    }
+
     private String resolveAbsoluteUrl(String url) {
-        if (url == null) {
-            return null;
+        if (url == null || url.isBlank()) {
+            return url;
         }
-        if (url.contains("127.0.0.1:8787") && !this.baseUrl.contains("127.0.0.1:8787")) {
-            return url.replace("http://127.0.0.1:8787", this.baseUrl.replaceAll("/+$", ""));
+        try {
+            java.net.URI uri = java.net.URI.create(url);
+            String path = uri.getRawPath();
+            String query = uri.getRawQuery();
+            String fragment = uri.getRawFragment();
+            StringBuilder sb = new StringBuilder(this.baseUrl.replaceAll("/+$", ""));
+            if (path != null && !path.startsWith("/")) {
+                sb.append("/");
+            }
+            if (path != null) {
+                sb.append(path);
+            }
+            if (query != null) {
+                sb.append("?").append(query);
+            }
+            if (fragment != null) {
+                sb.append("#").append(fragment);
+            }
+            return sb.toString();
+        } catch (Exception ignored) {
+            return url;
         }
-        return url;
     }
 
     public void uploadBlobDirect(

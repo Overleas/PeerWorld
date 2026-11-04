@@ -163,7 +163,7 @@ async fn run_integration(args: &Args) -> anyhow::Result<()> {
     let base_url = std::env::var("SHAREDWORLD_PUBLIC_URL")
         .ok()
         .filter(|v| !v.is_empty())
-        .unwrap_or_else(|| "https://functioning-upcoming-held-budget.trycloudflare.com".to_string());
+        .unwrap_or_else(|| "http://127.0.0.1:8787".to_string());
     let persistence = IntegrationPersistence {
         db_path: std::env::var("SHAREDWORLD_INTEGRATION_DB_FILE")
             .ok()

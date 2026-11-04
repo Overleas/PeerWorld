@@ -449,6 +449,7 @@ public final class SharedWorldSessionCoordinator {
         RecoveryFingerprint fingerprint = fingerprint(record);
         this.suppressedRecoveryFingerprint = fingerprint;
         if (!resumesThroughWaiting(record)) {
+            this.clientShell.setScreen(this.sessionUi.waiting(parent, record.worldId(), record.worldName(), null));
             beginJoinAttempt(
                     parent,
                     record.worldId(),
