@@ -494,10 +494,10 @@ public final class CreateSharedWorldScreen extends VersionedScreen implements Lo
             email = this.storageAccount.email();
         }
         if (email != null && (email.contains("example.com") || email.contains("integration-drive"))) {
-            return Component.literal("Хмарне сховище (24/7 Cloud Sync)");
+            return Component.translatable("screen.sharedworld.storage_saving_to_drive");
         }
         return email == null || email.isBlank()
-                ? Component.literal("Хмарне сховище (24/7 Cloud Sync)") // "screen.sharedworld.storage_saving_to_drive"
+                ? Component.translatable("screen.sharedworld.storage_saving_to_drive")
                 : SharedWorldText.component("screen.sharedworld.storage_saving_to", email);
     }
 

@@ -1652,12 +1652,22 @@ public final class SharedWorldHostingManager {
         this.startupProgressRelay.relay(
                 progressRelayAuthority(context),
                 new StartupProgressDto(
-                        state.label().getString(),
+                        progressLabelForRelay(state),
                         state.mode() == SharedWorldProgressState.ProgressMode.DETERMINATE ? "determinate" : "indeterminate",
                         fraction,
                         null
                 )
         );
+    }
+
+    private static String progressLabelForRelay(SharedWorldProgressState state) {
+        if (state == null || state.label() == null) {
+            return "";
+        }
+        if (state.label().getContents() instanceof net.minecraft.network.chat.contents.TranslatableContents translatable) {
+            return translatable.getKey();
+        }
+        return state.label().getString();
     }
 
     public void relayCoordinatedReleaseProgress(SharedWorldProgressState progressState) {

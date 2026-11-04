@@ -57,32 +57,60 @@ final class SharedWorldWaitingFlowLogic {
     }
 
     private static Component localizeProgressLabel(String label) {
+        if (label.startsWith("screen." + "sharedworld.progress.")) {
+            return Component.translatable(label);
+        }
         String normalized = label.trim().toLowerCase();
         return switch (normalized) {
-            case "uploading the world", "screen.sharedworld.progress.uploading_world", "release_preparing", "release_finishing" ->
+            case "uploading the world", "screen.sharedworld.progress.uploading_world", "release_preparing", "release_finishing",
+                 "відправка світу в хмару", "завантаження світу в хмару", "збереження світу в хмару",
+                 "subiendo el mundo", "s'està pujant el món" ->
                     Component.translatable("screen.sharedworld.progress.uploading_world");
-            case "preparing world", "screen.sharedworld.progress.preparing_world", "preparing_world" ->
+
+            case "preparing world", "screen.sharedworld.progress.preparing_world", "preparing_world",
+                 "підготовка світу", "preparando el mundo", "s'està preparant el món" ->
                     Component.translatable("screen.sharedworld.progress.preparing_world");
-            case "finishing up", "screen.sharedworld.progress.finishing_up", "finishing_up" ->
+
+            case "finishing up", "screen.sharedworld.progress.finishing_up", "finishing_up",
+                 "завершення", "finalizando", "s'està acabant" ->
                     Component.translatable("screen.sharedworld.progress.finishing_up");
-            case "becoming the host", "screen.sharedworld.progress.becoming_host", "becoming_host" ->
+
+            case "becoming the host", "screen.sharedworld.progress.becoming_host", "becoming_host",
+                 "стаємо хостом" ->
                     Component.translatable("screen.sharedworld.progress.becoming_host");
-            case "connecting", "screen.sharedworld.progress.connecting" ->
+
+            case "connecting", "screen.sharedworld.progress.connecting",
+                 "підключення", "conectando", "s'està connectant" ->
                     Component.translatable("screen.sharedworld.progress.connecting");
-            case "saving world...", "saving world", "screen.sharedworld.progress.saving_world", "saving_world" ->
+
+            case "saving world...", "saving world", "screen.sharedworld.progress.saving_world", "saving_world",
+                 "збереження світу...", "збереження світу", "guardando el mundo...", "s'està desant el món..." ->
                     Component.translatable("screen.sharedworld.progress.saving_world");
-            case "leaving world...", "leaving world", "screen.sharedworld.progress.leaving_world", "leaving_world" ->
+
+            case "leaving world...", "leaving world", "screen.sharedworld.progress.leaving_world", "leaving_world",
+                 "вихід зі світу...", "вихід зі світу", "saliendo del mundo...", "s'està sortint del món..." ->
                     Component.translatable("screen.sharedworld.progress.leaving_world");
-            case "downloading the world", "screen.sharedworld.progress.syncing_world", "syncing_world" ->
+
+            case "downloading the world", "screen.sharedworld.progress.syncing_world", "syncing_world",
+                 "завантаження світу", "descargando el mundo", "s'està descarregant el món" ->
                     Component.translatable("screen.sharedworld.progress.syncing_world");
-            case "recovering your world", "screen.sharedworld.progress.recovering_local_world", "recovering_local_world" ->
+
+            case "recovering your world", "screen.sharedworld.progress.recovering_local_world", "recovering_local_world",
+                 "відновлення твого світу", "recuperando tu mundo", "s'està recuperant el món" ->
                     Component.translatable("screen.sharedworld.progress.recovering_local_world");
-            case "uploading unsaved changes from your last session", "screen.sharedworld.progress.uploading_local_changes", "uploading_local_changes" ->
+
+            case "uploading unsaved changes from your last session", "screen.sharedworld.progress.uploading_local_changes", "uploading_local_changes",
+                 "вивантаження незбережених змін минулої сесії", "subiendo los cambios no guardados de tu última sesión", "s'estan pujant els canvis no desats de l'última sessió" ->
                     Component.translatable("screen.sharedworld.progress.uploading_local_changes");
-            case "waiting for the host", "screen.sharedworld.progress.waiting_for_host", "handoff_wait" ->
+
+            case "waiting for the host", "screen.sharedworld.progress.waiting_for_host", "handoff_wait",
+                 "очікування хоста", "esperando al anfitrión", "s'està esperant l'amfitrió" ->
                     Component.translatable("screen.sharedworld.progress.waiting_for_host");
-            case "waiting for the previous host to finish saving", "screen.sharedworld.progress.finalizing_previous_host", "finalizing_previous_host" ->
+
+            case "waiting for the previous host to finish saving", "screen.sharedworld.progress.finalizing_previous_host", "finalizing_previous_host",
+                 "очікування збереження попереднім хостом", "esperando a que el anfitrión anterior termine de guardar", "s'està esperant que l'amfitrió anterior acabi de desar" ->
                     Component.translatable("screen.sharedworld.progress.finalizing_previous_host");
+
             default -> Component.literal(label);
         };
     }
