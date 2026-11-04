@@ -64,12 +64,12 @@ final class EditWorldSettingsForm {
 
     /** Rebuilds the tab's buttons; called from the screen's init (also on resize). */
     void createWidgets() {
-        this.difficultyButton = Button.builder(Component.empty(), ignored -> this.cycleDifficulty()).width(170).build();
-        this.gameModeButton = Button.builder(Component.empty(), ignored -> this.cycleGameMode()).width(170).build();
-        this.maxBackupsButton = Button.builder(Component.empty(), ignored -> this.cycleMaxBackups()).width(170).build();
+        this.difficultyButton = Button.builder(Component.empty(), ignored -> this.cycleDifficulty()).width(220).build();
+        this.gameModeButton = Button.builder(Component.empty(), ignored -> this.cycleGameMode()).width(220).build();
+        this.maxBackupsButton = Button.builder(Component.empty(), ignored -> this.cycleMaxBackups()).width(220).build();
         this.ruleButtons.clear();
         for (SharedWorldGameRule rule : SharedWorldGameRule.values()) {
-            this.ruleButtons.put(rule, Button.builder(Component.empty(), ignored -> this.toggleRule(rule)).width(170).build());
+            this.ruleButtons.put(rule, Button.builder(Component.empty(), ignored -> this.toggleRule(rule)).width(220).build());
         }
     }
 
@@ -83,7 +83,7 @@ final class EditWorldSettingsForm {
     }
 
     void layout(ScreenRectangle area) {
-        int columnWidth = Math.min(170, area.width() / 2 - 24);
+        int columnWidth = Math.min(220, area.width() / 2 - 16);
         int leftColumn = area.left() + (area.width() / 2 - columnWidth) / 2;
         int rightColumn = area.left() + area.width() / 2 + (area.width() / 2 - columnWidth) / 2;
         int top = area.top() + 34;

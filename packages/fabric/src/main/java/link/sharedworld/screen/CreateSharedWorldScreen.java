@@ -497,7 +497,7 @@ public final class CreateSharedWorldScreen extends VersionedScreen implements Lo
             return Component.literal("Хмарне сховище (24/7 Cloud Sync)");
         }
         return email == null || email.isBlank()
-                ? Component.literal("Хмарне сховище (24/7 Cloud Sync)")
+                ? Component.literal("Хмарне сховище (24/7 Cloud Sync)") // "screen.sharedworld.storage_saving_to_drive"
                 : SharedWorldText.component("screen.sharedworld.storage_saving_to", email);
     }
 

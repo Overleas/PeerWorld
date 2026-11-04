@@ -381,5 +381,11 @@
   "screen.sharedworld.env_backup_note": "Si algo sale mal, puedes restaurar una copia de seguridad anterior desde los ajustes del mundo.",
   "screen.sharedworld.env_host": "Hospedar igualmente",
   "screen.sharedworld.env_cancel": "Cancelar",
-  "screen.sharedworld.env_countdown": "Cancelando en %ss..."
+  "screen.sharedworld.env_countdown": "Cancelando en %ss...",
+  "screen.sharedworld.storage_provider_cloud": "Servidor en la nube (Render 24/7)",
+  "screen.sharedworld.storage_cloud_account": "Cuenta autónoma 24/7",
+  "screen.sharedworld.storage_quota_unlimited": "Ilimitado (Nube Render)",
+  "screen.sharedworld.allow_offline_on": "Modo sin conexión: Activado",
+  "screen.sharedworld.allow_offline_off": "Modo sin conexión: Desactivado",
+  "screen.sharedworld.cloud_storage_status_connected": "Almacenamiento en la nube: Conectado (Render 24/7 Cloud)"
 }

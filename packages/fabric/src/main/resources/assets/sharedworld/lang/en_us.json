@@ -382,7 +382,10 @@
   "screen.sharedworld.env_host": "Host anyway",
   "screen.sharedworld.env_cancel": "Cancel",
   "screen.sharedworld.env_countdown": "Cancelling in %ss...",
-  "screen.sharedworld.allow_offline_on": "Allow Offline/Cracked Players: ON",
-  "screen.sharedworld.allow_offline_off": "Allow Offline/Cracked Players: OFF",
-  "screen.sharedworld.cloud_storage_status_connected": "Cloud Storage: Connected (24/7 Render Cloud)"
+  "screen.sharedworld.allow_offline_on": "Offline mode: On",
+  "screen.sharedworld.allow_offline_off": "Offline mode: Off",
+  "screen.sharedworld.cloud_storage_status_connected": "Cloud Storage: Connected (Render 24/7 Cloud)",
+  "screen.sharedworld.storage_provider_cloud": "Cloud Server (Render 24/7)",
+  "screen.sharedworld.storage_cloud_account": "Autonomous 24/7 Account",
+  "screen.sharedworld.storage_quota_unlimited": "Unlimited (Render Cloud)"
 }

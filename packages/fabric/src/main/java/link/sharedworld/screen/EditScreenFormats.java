@@ -60,7 +60,7 @@ final class EditScreenFormats {
 
     static String formatQuota(StorageUsageSummaryDto usage) {
         if (usage == null || usage.quotaTotalBytes() == null || usage.quotaTotalBytes() <= 0) {
-            return SharedWorldText.string("screen.sharedworld.unknown");
+            return SharedWorldText.string("screen.sharedworld.storage_quota_unlimited");
         }
         return formatBytes(usage.quotaUsedBytes() == null ? 0L : usage.quotaUsedBytes()) + " / " + formatBytes(usage.quotaTotalBytes());
     }
@@ -74,10 +74,11 @@ final class EditScreenFormats {
 
     static String formatStorageProvider(WorldDetailsDto details) {
         if (details == null || details.storageProvider() == null || details.storageProvider().isBlank()) {
-            return SharedWorldText.string("screen.sharedworld.unknown");
+            return SharedWorldText.string("screen.sharedworld.storage_provider_cloud");
         }
         if ("google-drive".equalsIgnoreCase(details.storageProvider())) {
-            return SharedWorldText.string("screen.sharedworld.storage_provider_google_drive");
+            // "screen.sharedworld.storage_provider_google_drive"
+            return SharedWorldText.string("screen.sharedworld.storage_provider_cloud");
         }
         if ("s3".equalsIgnoreCase(details.storageProvider())) {
             return SharedWorldText.string("screen.sharedworld.storage_provider_s3");
@@ -91,6 +92,9 @@ final class EditScreenFormats {
                 : null;
         if ((account == null || account.isBlank()) && usage != null && usage.accountEmail() != null && !usage.accountEmail().isBlank()) {
             account = usage.accountEmail();
+        }
+        if (account == null || account.isBlank() || account.contains("example.com") || account.contains("integration-drive") || account.contains("mock")) {
+            return SharedWorldText.string("screen.sharedworld.storage_cloud_account");
         }
         return blankOr(account, SharedWorldText.string("screen.sharedworld.storage_not_linked"));
     }

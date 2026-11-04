@@ -113,13 +113,13 @@ public final class EditSharedWorldScreen extends VersionedScreen {
 
         LinearLayout footer = this.layout.addToFooter(link.sharedworld.versioned.LayoutCompat.horizontalLayout(8));
         this.backButton = footer.addChild(Button.builder(Component.translatable("gui.back"), ignored -> this.onBack())
-                .width(120)
+                .width(90)
                 .build());
         this.secondaryButton = footer.addChild(Button.builder(Component.literal(""), ignored -> this.onSecondaryAction())
-                .width(120)
+                .width(130)
                 .build());
         this.primaryButton = footer.addChild(Button.builder(Component.literal(""), ignored -> this.onPrimaryAction())
-                .width(150)
+                .width(130)
                 .build());
         this.layout.visitWidgets(this::addRenderableWidget);
 
@@ -300,7 +300,7 @@ public final class EditSharedWorldScreen extends VersionedScreen {
         int top = this.contentArea.top();
         // Under the two-button left column, wrapped to that column's width so
         // it can never run into the gamerule toggles on the right.
-        int columnWidth = Math.min(170, this.contentArea.width() / 2 - 24);
+        int columnWidth = Math.min(220, this.contentArea.width() / 2 - 16);
         int leftColumn = this.contentArea.left() + (this.contentArea.width() / 2 - columnWidth) / 2;
         if (!this.isOwner()) {
             WrappedText.draw(guiGraphics, this.font, Component.translatable("screen.sharedworld.settings_owner_only"),
@@ -540,11 +540,12 @@ public final class EditSharedWorldScreen extends VersionedScreen {
     }
 
     private void layoutFooterButtons() {
-        int availableWidth = Math.min(420, this.width - 48);
-        int buttonWidth = Math.max(100, (availableWidth - 16) / 3);
-        this.backButton.setWidth(buttonWidth);
-        this.secondaryButton.setWidth(buttonWidth);
-        this.primaryButton.setWidth(buttonWidth);
+        int availableWidth = Math.min(440, this.width - 32);
+        int backWidth = 85;
+        int actionWidth = Math.max(120, (availableWidth - 16 - backWidth) / 2);
+        this.backButton.setWidth(backWidth);
+        this.secondaryButton.setWidth(actionWidth);
+        this.primaryButton.setWidth(actionWidth);
         this.layout.arrangeElements();
     }
 

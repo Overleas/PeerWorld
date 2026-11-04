@@ -381,5 +381,11 @@
   "screen.sharedworld.env_backup_note": "Si alguna cosa va malament, pots restaurar una còpia de seguretat anterior des de la configuració del món.",
   "screen.sharedworld.env_host": "Allotjar igualment",
   "screen.sharedworld.env_cancel": "Cancel·la",
-  "screen.sharedworld.env_countdown": "Cancel·lant en %ss..."
+  "screen.sharedworld.env_countdown": "Cancel·lant en %ss...",
+  "screen.sharedworld.storage_provider_cloud": "Servidor al núvol (Render 24/7)",
+  "screen.sharedworld.storage_cloud_account": "Compte autònom 24/7",
+  "screen.sharedworld.storage_quota_unlimited": "Il·limitat (Núvol Render)",
+  "screen.sharedworld.allow_offline_on": "Mode fora de línia: Activat",
+  "screen.sharedworld.allow_offline_off": "Mode fora de línia: Desactivat",
+  "screen.sharedworld.cloud_storage_status_connected": "Emmagatzematge al núvol: Connectat (Render 24/7 Cloud)"
 }
