@@ -491,9 +491,6 @@ public final class CreateSharedWorldScreen extends VersionedScreen implements Lo
         } else if (this.storageAccount != null && this.storageAccount.linked()) {
             email = this.storageAccount.email();
         }
-        if (email != null && (email.contains("example.com") || email.contains("integration-drive"))) {
-            return Component.translatable("screen.sharedworld.storage_saving_to_drive");
-        }
         return email == null || email.isBlank()
                 ? Component.translatable("screen.sharedworld.storage_saving_to_drive")
                 : SharedWorldText.component("screen.sharedworld.storage_saving_to", email);

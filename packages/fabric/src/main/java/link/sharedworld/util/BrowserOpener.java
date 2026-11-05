@@ -25,21 +25,6 @@ public final class BrowserOpener {
         if ("1".equals(System.getenv("SHAREDWORLD_NO_BROWSER"))) {
             return true;
         }
-        if (url != null && url.contains("mock=1")) {
-            try {
-                java.net.http.HttpClient client = java.net.http.HttpClient.newBuilder()
-                        .connectTimeout(java.time.Duration.ofSeconds(10))
-                        .build();
-                java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder()
-                        .uri(URI.create(url))
-                        .timeout(java.time.Duration.ofSeconds(10))
-                        .GET()
-                        .build();
-                client.sendAsync(request, java.net.http.HttpResponse.BodyHandlers.discarding());
-                return true;
-            } catch (Exception ignored) {
-            }
-        }
         String[] command = platformCommand(url);
         if (command != null) {
             try {

@@ -471,7 +471,7 @@ public final class SettingsScreen extends link.sharedworld.versioned.VersionedSc
                 return Component.translatable(this.notLinkedKey);
             }
             String who = this.account.email() != null ? this.account.email() : "?";
-            if (who.contains("example.com") || who.contains("integration-drive")) {
+            if ("render-cloud".equals(who)) {
                 return Component.translatable("screen.sharedworld.cloud_storage_status_connected");
             }
             return Component.translatable(this.account.healthy() ? this.linkedKey : this.linkedUnhealthyKey, who);
