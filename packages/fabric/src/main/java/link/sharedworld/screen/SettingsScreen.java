@@ -64,8 +64,11 @@ public final class SettingsScreen extends link.sharedworld.versioned.VersionedSc
     private Button saveButton;
     private EditBox customJoinBox;
     private Button toggleOfflineButton;
+    private Button autosaveIntervalButton;
     private boolean savedAllowOffline;
     private boolean currentAllowOffline;
+    private int savedAutosaveInterval;
+    private int currentAutosaveInterval;
     /** Last value persisted to the local config store ("" = none). */
     private String savedCustomJoinAddress = "";
 
@@ -96,11 +99,21 @@ public final class SettingsScreen extends link.sharedworld.versioned.VersionedSc
         this.savedCustomJoinAddress = blankOr(link.sharedworld.SharedWorldClientConfigStore.shared().customJoinAddress(), "");
         this.savedAllowOffline = link.sharedworld.SharedWorldClientConfigStore.shared().allowOfflinePlayers();
         this.currentAllowOffline = this.savedAllowOffline;
+        this.savedAutosaveInterval = link.sharedworld.SharedWorldClientConfigStore.shared().autosaveIntervalMinutes();
+        this.currentAutosaveInterval = this.savedAutosaveInterval;
         this.toggleOfflineButton = Button.builder(
                 this.offlineButtonMessage(),
                 button -> {
                     this.currentAllowOffline = !this.currentAllowOffline;
                     button.setMessage(this.offlineButtonMessage());
+                    this.updateButtons();
+                }
+        ).width(260).build();
+        this.autosaveIntervalButton = Button.builder(
+                this.autosaveButtonMessage(),
+                button -> {
+                    this.cycleAutosaveInterval();
+                    button.setMessage(this.autosaveButtonMessage());
                     this.updateButtons();
                 }
         ).width(260).build();
@@ -224,6 +237,29 @@ public final class SettingsScreen extends link.sharedworld.versioned.VersionedSc
         );
     }
 
+    private void cycleAutosaveInterval() {
+        int[] intervals = {5, 15, 30, 60, 120};
+        int next = intervals[0];
+        for (int i = 0; i < intervals.length; i++) {
+            if (intervals[i] == this.currentAutosaveInterval) {
+                next = intervals[(i + 1) % intervals.length];
+                break;
+            }
+        }
+        this.currentAutosaveInterval = next;
+    }
+
+    private Component autosaveButtonMessage() {
+        String timeStr;
+        if (this.currentAutosaveInterval >= 60) {
+            int hours = this.currentAutosaveInterval / 60;
+            timeStr = hours + " " + link.sharedworld.SharedWorldText.string("screen.peerworld.unit_hours");
+        } else {
+            timeStr = this.currentAutosaveInterval + " " + link.sharedworld.SharedWorldText.string("screen.peerworld.unit_minutes");
+        }
+        return Component.translatable("screen.peerworld.settings_autosave_interval", timeStr);
+    }
+
     private void renderAdvancedDecorations(GuiGraphics guiGraphics) {
         int left = this.customJoinBox.getX();
         int textWidth = Math.min(320, this.contentArea.width() - 76);
@@ -243,7 +279,9 @@ public final class SettingsScreen extends link.sharedworld.versioned.VersionedSc
             return false;
         }
         String current = blankOr(link.sharedworld.host.CustomJoinAddressPolicy.normalize(this.customJoinBox.getValue()), "");
-        return !current.equals(this.savedCustomJoinAddress) || this.currentAllowOffline != this.savedAllowOffline;
+        return !current.equals(this.savedCustomJoinAddress)
+                || this.currentAllowOffline != this.savedAllowOffline
+                || this.currentAutosaveInterval != this.savedAutosaveInterval;
     }
 
     private boolean isAdvancedValid() {
@@ -263,6 +301,8 @@ public final class SettingsScreen extends link.sharedworld.versioned.VersionedSc
         this.savedCustomJoinAddress = value == null ? "" : value;
         link.sharedworld.SharedWorldClientConfigStore.shared().setAllowOfflinePlayers(this.currentAllowOffline);
         this.savedAllowOffline = this.currentAllowOffline;
+        link.sharedworld.SharedWorldClientConfigStore.shared().setAutosaveIntervalMinutes(this.currentAutosaveInterval);
+        this.savedAutosaveInterval = this.currentAutosaveInterval;
         this.statusBanner.setTransient(SharedWorldStatusBanner.Kind.SUCCESS,
                 Component.translatable("screen.sharedworld.settings_saved"), SUCCESS_STATUS_TTL_MS);
         this.updateButtons();
@@ -541,6 +581,7 @@ public final class SettingsScreen extends link.sharedworld.versioned.VersionedSc
         public void visitChildren(Consumer<AbstractWidget> consumer) {
             consumer.accept(SettingsScreen.this.customJoinBox);
             consumer.accept(SettingsScreen.this.toggleOfflineButton);
+            consumer.accept(SettingsScreen.this.autosaveIntervalButton);
         }
 
         @Override
@@ -548,9 +589,11 @@ public final class SettingsScreen extends link.sharedworld.versioned.VersionedSc
             int centerX = SettingsScreen.this.width / 2;
             int boxWidth = Math.min(260, area.width() - 76);
             SettingsScreen.this.toggleOfflineButton.setWidth(boxWidth);
-            SettingsScreen.this.toggleOfflineButton.setPosition(centerX - boxWidth / 2, area.top() + 12);
+            SettingsScreen.this.toggleOfflineButton.setPosition(centerX - boxWidth / 2, area.top() + 8);
+            SettingsScreen.this.autosaveIntervalButton.setWidth(boxWidth);
+            SettingsScreen.this.autosaveIntervalButton.setPosition(centerX - boxWidth / 2, area.top() + 32);
             SettingsScreen.this.customJoinBox.setWidth(boxWidth);
-            SettingsScreen.this.customJoinBox.setPosition(centerX - boxWidth / 2, area.top() + 58);
+            SettingsScreen.this.customJoinBox.setPosition(centerX - boxWidth / 2, area.top() + 74);
         }
     }
 }

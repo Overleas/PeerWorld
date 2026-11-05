@@ -18,13 +18,29 @@ public final class SharedWorldClientConfigStore {
     private final Path file;
     private ClientConfig state;
 
+    private static volatile SharedWorldClientConfigStore instance;
+
     public SharedWorldClientConfigStore(Path file) {
         this.file = file;
         this.state = load();
     }
 
     public static SharedWorldClientConfigStore shared() {
-        return Holder.INSTANCE;
+        SharedWorldClientConfigStore current = instance;
+        if (current != null) {
+            return current;
+        }
+        synchronized (SharedWorldClientConfigStore.class) {
+            if (instance == null) {
+                Path path = null;
+                try {
+                    path = link.sharedworld.platform.SharedWorldPlatform.get().resolveConfigFile("client");
+                } catch (Throwable ignored) {
+                }
+                instance = new SharedWorldClientConfigStore(path);
+            }
+            return instance;
+        }
     }
 
     public synchronized boolean shouldOpenSharedWorldByDefault() {
@@ -99,13 +115,22 @@ public final class SharedWorldClientConfigStore {
         save();
     }
 
+    public synchronized int autosaveIntervalMinutes() {
+        return this.state.hosting.autosaveIntervalMinutes <= 0 ? 15 : this.state.hosting.autosaveIntervalMinutes;
+    }
+
+    public synchronized void setAutosaveIntervalMinutes(int minutes) {
+        this.state.hosting.autosaveIntervalMinutes = Math.max(1, minutes);
+        save();
+    }
+
     /** Account deletion: revert to defaults in memory only (the file is deleted separately). */
     public synchronized void resetForAccountDeletion() {
         this.state = new ClientConfig();
     }
 
     private ClientConfig load() {
-        if (!Files.exists(this.file)) {
+        if (this.file == null || !Files.exists(this.file)) {
             return new ClientConfig();
         }
 
@@ -119,6 +144,9 @@ public final class SharedWorldClientConfigStore {
     }
 
     private void save() {
+        if (this.file == null) {
+            return;
+        }
         try {
             if (this.file.getParent() != null) {
                 Files.createDirectories(this.file.getParent());
@@ -206,12 +234,6 @@ public final class SharedWorldClientConfigStore {
         SHAREDWORLD
     }
 
-    private static final class Holder {
-        private static final SharedWorldClientConfigStore INSTANCE = new SharedWorldClientConfigStore(
-                link.sharedworld.platform.SharedWorldPlatform.get().resolveConfigFile("client")
-        );
-    }
-
     private static final class ClientConfig {
         private BackendConfig backend = new BackendConfig();
         private UiConfig ui = new UiConfig();
@@ -221,6 +243,7 @@ public final class SharedWorldClientConfigStore {
     private static final class HostingConfig {
         private String customJoinAddress;
         private boolean allowOfflinePlayers = true;
+        private int autosaveIntervalMinutes = 15;
     }
 
     private static final class BackendConfig {

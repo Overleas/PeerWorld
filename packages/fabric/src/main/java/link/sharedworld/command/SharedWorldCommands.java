@@ -98,6 +98,18 @@ public final class SharedWorldCommands {
                 .then(Commands.argument("player", StringArgumentType.word())
                         .suggests(memberNames)
                         .executes(context -> banMember(context, apiClient, hostingManager, ioExecutor, clientMainThreadExecutor))));
+        dispatcher.register(Commands.literal("peerworld")
+                .requires(source -> SharedWorldDevSessionBridge.isHostingSharedWorld())
+                .then(Commands.literal("backup")
+                        .executes(context -> runBackupCommand(context, null, hostingManager))
+                        .then(Commands.argument("name", StringArgumentType.greedyString())
+                                .executes(context -> runBackupCommand(context, StringArgumentType.getString(context, "name"), hostingManager)))));
+        dispatcher.register(Commands.literal("pw")
+                .requires(source -> SharedWorldDevSessionBridge.isHostingSharedWorld())
+                .then(Commands.literal("backup")
+                        .executes(context -> runBackupCommand(context, null, hostingManager))
+                        .then(Commands.argument("name", StringArgumentType.greedyString())
+                                .executes(context -> runBackupCommand(context, StringArgumentType.getString(context, "name"), hostingManager)))));
         // Vanilla added integrated-server /kick in 1.20.2; register a session-only
         // fallback where it is absent (in practice: the 1.20.1 bucket).
         if (dispatcher.getRoot().getChild("kick") == null) {
@@ -383,6 +395,43 @@ public final class SharedWorldCommands {
         } catch (RuntimeException exception) {
             return null;
         }
+    }
+
+    private static int runBackupCommand(
+            CommandContext<CommandSourceStack> context,
+            String customName,
+            Supplier<SharedWorldHostingManager> hostingManager
+    ) {
+        CommandSourceStack source = context.getSource();
+        SharedWorldHostingManager manager = hostingManager.get();
+        if (manager == null || !manager.isHosting()) {
+            source.sendFailure(Component.translatable("peerworld.command.not_hosting"));
+            return 0;
+        }
+
+        String displayName = (customName != null && !customName.isBlank()) ? customName.trim() : null;
+        source.sendSuccess(() -> Component.translatable(
+                displayName == null ? "peerworld.command.backup_starting" : "peerworld.command.backup_starting_named",
+                displayName == null ? "" : displayName), false);
+
+        MinecraftServer server = source.getServer();
+        boolean queued = manager.triggerManualBackup(
+                () -> server.execute(() -> source.sendSuccess(
+                        () -> Component.translatable(
+                                displayName == null ? "peerworld.command.backup_success" : "peerworld.command.backup_success_named",
+                                displayName == null ? "" : displayName),
+                        true
+                )),
+                error -> server.execute(() -> source.sendFailure(
+                        Component.translatable("peerworld.command.backup_failed", friendlyMessage(error))
+                ))
+        );
+
+        if (!queued) {
+            source.sendFailure(Component.translatable("peerworld.command.backup_in_progress"));
+            return 0;
+        }
+        return 1;
     }
 
     private static String friendlyMessage(Throwable throwable) {

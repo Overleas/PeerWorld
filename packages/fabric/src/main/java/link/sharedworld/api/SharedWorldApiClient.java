@@ -958,7 +958,7 @@ public final class SharedWorldApiClient {
                 throw retryFailure;
             }
         }
-        boolean isOfflineMode = this.certificateProvider.currentCertificate().isEmpty() || identity.isDevSession();
+        boolean isOfflineMode = identity.isDevSession() || (session != null && session.token() != null && session.token().startsWith("offline-"));
         cacheSession(session, isOfflineMode, isOfflineMode);
         if (this.sessionPersistence != null) {
             this.sessionPersistence.save(this.baseUrl, identity.playerUuid(), session);
@@ -975,11 +975,17 @@ public final class SharedWorldApiClient {
     private SessionTokenDto establishMojangSession(SessionIdentity identity) throws IOException, InterruptedException {
         java.util.Optional<ProfileCertificateData> certificate = this.certificateProvider.currentCertificate();
         if (certificate.isPresent()) {
-            try {
-                return establishCertificateSession(identity, certificate.get());
-            } catch (Exception certException) {
-                LOGGER.info("SharedWorld: Certificate auth failed ({}), falling back to offline authentication.", certException.getMessage());
-            }
+            return establishCertificateSession(identity, certificate.get());
+        }
+        if (Boolean.getBoolean("sharedworld.disableOfflineAuth")) {
+            throw new SharedWorldApiException(
+                    "profile_keys_unavailable",
+                    "SharedWorld could not get your Minecraft profile keys, which it needs to sign in. "
+                            + "This usually means the game is not signed in to a Minecraft account, "
+                            + "or a mod that blocks chat signing is installed. "
+                            + "Restart the game and try again; if it keeps happening, check your installed mods.",
+                    0
+            );
         }
         LOGGER.info("SharedWorld: Using offline authentication fallback.");
         try {

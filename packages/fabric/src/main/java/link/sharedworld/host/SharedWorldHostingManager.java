@@ -563,12 +563,21 @@ public final class SharedWorldHostingManager {
         }
     }
 
+    private long configuredAutosaveIntervalMs() {
+        try {
+            return link.sharedworld.SharedWorldClientConfigStore.shared().autosaveIntervalMinutes() * 60_000L;
+        } catch (Throwable ignored) {
+            return this.autosaveIntervalMs;
+        }
+    }
+
     private void driveRunningLoop(long now) {
         if (this.phase != Phase.RUNNING || this.coordinatedRelease != CoordinatedRelease.NONE) {
             return;
         }
+        long currentInterval = configuredAutosaveIntervalMs();
         if (now >= this.autosaveNotBefore
-                && now - this.lastAutosaveAt >= this.autosaveIntervalMs
+                && now - this.lastAutosaveAt >= currentInterval
                 && this.saveInFlight.compareAndSet(0L, this.hostSessionGeneration)) {
             uploadSnapshot();
         }
@@ -1163,7 +1172,27 @@ public final class SharedWorldHostingManager {
      * HostAttemptContext is still current.
      * Authority source: Current HostAttemptContext plus backend upload authorization.
      */
+    public boolean isHosting() {
+        return this.phase == Phase.RUNNING || this.phase == Phase.SAVING;
+    }
+
+    public boolean triggerManualBackup(Runnable onComplete, java.util.function.Consumer<Exception> onError) {
+        HostAttemptContext context = currentAttemptContext();
+        if (context == null || this.phase != Phase.RUNNING || this.coordinatedRelease != CoordinatedRelease.NONE) {
+            return false;
+        }
+        if (this.saveInFlight.compareAndSet(0L, this.hostSessionGeneration)) {
+            uploadSnapshot(onComplete, onError);
+            return true;
+        }
+        return false;
+    }
+
     private void uploadSnapshot() {
+        uploadSnapshot(null, null);
+    }
+
+    private void uploadSnapshot(Runnable onComplete, java.util.function.Consumer<Exception> onError) {
         HostAttemptContext context = currentAttemptContext();
         if (context == null) {
             this.saveInFlight.set(0L);
@@ -1196,8 +1225,14 @@ public final class SharedWorldHostingManager {
                     if (this.coordinatedRelease == CoordinatedRelease.NONE) {
                         setPhase(Phase.RUNNING);
                     }
+                    if (onComplete != null) {
+                        onComplete.run();
+                    }
                 });
             } catch (Exception exception) {
+                if (onError != null) {
+                    dispatchToMainThread(() -> onError.accept(exception));
+                }
                 if (!isCurrentAttempt(context)) {
                     return;
                 }

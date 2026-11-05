@@ -227,8 +227,6 @@ public final class CreateSharedWorldScreen extends VersionedScreen implements Lo
                     if (advanced) {
                         this.onStepChanged();
                     } else {
-                        // Automatically link storage in the background so player never sees the Google Drive screen
-                        this.beginStorageLink(false, null);
                         this.updateStorageBanner();
                         this.updateButtons();
                     }

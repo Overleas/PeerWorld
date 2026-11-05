@@ -133,20 +133,25 @@ final class SharedWorldApiClientCertAuthTest {
 
     @Test
     void aCertLessClientIsToldItsProfileKeysAreUnavailable() throws Exception {
-        String baseUrl = startServer();
-        AtomicInteger challengeCalls = new AtomicInteger();
-        this.server.createContext("/auth/challenge", exchange -> {
-            challengeCalls.incrementAndGet();
-            writeJson(exchange, 200, "{\"serverId\":\"server-1\",\"expiresAt\":\"2099-01-01T00:00:00.000Z\"}");
-        });
+        System.setProperty("sharedworld.disableOfflineAuth", "true");
+        try {
+            String baseUrl = startServer();
+            AtomicInteger challengeCalls = new AtomicInteger();
+            this.server.createContext("/auth/challenge", exchange -> {
+                challengeCalls.incrementAndGet();
+                writeJson(exchange, 200, "{\"serverId\":\"server-1\",\"expiresAt\":\"2099-01-01T00:00:00.000Z\"}");
+            });
 
-        SharedWorldApiClient.SharedWorldApiException error =
-                assertThrows(SharedWorldApiClient.SharedWorldApiException.class,
-                        () -> client(baseUrl, Optional.empty()).ensureSession());
+            SharedWorldApiClient.SharedWorldApiException error =
+                    assertThrows(SharedWorldApiClient.SharedWorldApiException.class,
+                            () -> client(baseUrl, Optional.empty()).ensureSession());
 
-        assertEquals("profile_keys_unavailable", error.error());
-        assertTrue(error.getMessage().contains("profile keys"), "the message names what is missing");
-        assertEquals(0, challengeCalls.get(), "no backend call is wasted when the keys are missing");
+            assertEquals("profile_keys_unavailable", error.error());
+            assertTrue(error.getMessage().contains("profile keys"), "the message names what is missing");
+            assertEquals(0, challengeCalls.get(), "no backend call is wasted when the keys are missing");
+        } finally {
+            System.clearProperty("sharedworld.disableOfflineAuth");
+        }
     }
 
     @Test
