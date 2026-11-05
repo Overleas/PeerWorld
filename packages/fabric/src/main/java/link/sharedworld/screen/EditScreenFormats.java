@@ -77,8 +77,7 @@ final class EditScreenFormats {
             return SharedWorldText.string("screen.sharedworld.storage_provider_cloud");
         }
         if ("google-drive".equalsIgnoreCase(details.storageProvider())) {
-            // "screen.sharedworld.storage_provider_google_drive"
-            return SharedWorldText.string("screen.sharedworld.storage_provider_cloud");
+            return SharedWorldText.string("screen.sharedworld.storage_provider_google_drive");
         }
         if ("s3".equalsIgnoreCase(details.storageProvider())) {
             return SharedWorldText.string("screen.sharedworld.storage_provider_s3");

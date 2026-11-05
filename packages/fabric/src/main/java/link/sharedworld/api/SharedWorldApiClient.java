@@ -532,28 +532,16 @@ public final class SharedWorldApiClient {
         if (url == null || url.isBlank()) {
             return url;
         }
-        try {
-            java.net.URI uri = java.net.URI.create(url);
-            String path = uri.getRawPath();
-            String query = uri.getRawQuery();
-            String fragment = uri.getRawFragment();
-            StringBuilder sb = new StringBuilder(this.baseUrl.replaceAll("/+$", ""));
-            if (path != null && !path.startsWith("/")) {
-                sb.append("/");
-            }
-            if (path != null) {
-                sb.append(path);
-            }
-            if (query != null) {
-                sb.append("?").append(query);
-            }
-            if (fragment != null) {
-                sb.append("#").append(fragment);
-            }
-            return sb.toString();
-        } catch (Exception ignored) {
-            return url;
+        if (url.startsWith("/")) {
+            return this.baseUrl.replaceAll("/+$", "") + url;
         }
+        if (url.contains("127.0.0.1:8787") && !this.baseUrl.contains("127.0.0.1:8787")) {
+            return url.replace("http://127.0.0.1:8787", this.baseUrl.replaceAll("/+$", ""));
+        }
+        if (url.contains("localhost:8787") && !this.baseUrl.contains("localhost:8787")) {
+            return url.replace("http://localhost:8787", this.baseUrl.replaceAll("/+$", ""));
+        }
+        return url;
     }
 
     public void uploadBlobDirect(
