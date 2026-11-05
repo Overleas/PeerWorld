@@ -95,7 +95,7 @@ public final class SharedWorldInviteScreen extends link.sharedworld.versioned.Ve
             return code + "@" + base;
         }
         try {
-            java.nio.file.Path tunnelFile = java.nio.file.Path.of("/home/overleas/.local/share/sharedworld-tunnel.url");
+            java.nio.file.Path tunnelFile = link.sharedworld.platform.SharedWorldPlatform.get().configDir().resolve("sharedworld-tunnel.url");
             if (java.nio.file.Files.exists(tunnelFile)) {
                 String tunnel = java.nio.file.Files.readString(tunnelFile).trim();
                 if (!tunnel.isBlank()) {

@@ -60,8 +60,7 @@ public final class SharedWorldClient {
                 link.sharedworld.platform.SharedWorldPlatform.get().configDir().resolve("peerworld-core"),
                 link.sharedworld.platform.SharedWorldPlatform.get().configDir().resolve("swcore"),
                 link.sharedworld.platform.SharedWorldPlatform.get().configDir().resolve("peerworld").resolve("swcore"),
-                link.sharedworld.platform.SharedWorldPlatform.get().configDir().resolve("sharedworld").resolve("swcore"),
-                java.nio.file.Path.of("/home/overleas/.gemini/antigravity/scratch/sharedworld-offline/packages/server/target/release/swcore")
+                link.sharedworld.platform.SharedWorldPlatform.get().configDir().resolve("sharedworld").resolve("swcore")
             };
             for (java.nio.file.Path candidate : candidates) {
                 if (java.nio.file.Files.isExecutable(candidate)) {

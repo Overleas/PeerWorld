@@ -1176,6 +1176,14 @@ public final class SharedWorldHostingManager {
         return this.phase == Phase.RUNNING || this.phase == Phase.SAVING;
     }
 
+    public WorldSummaryDto currentWorld() {
+        return this.world;
+    }
+
+    public String publishedJoinTarget() {
+        return this.publishedJoinTarget;
+    }
+
     public boolean triggerManualBackup(Runnable onComplete, java.util.function.Consumer<Exception> onError) {
         HostAttemptContext context = currentAttemptContext();
         if (context == null || this.phase != Phase.RUNNING || this.coordinatedRelease != CoordinatedRelease.NONE) {

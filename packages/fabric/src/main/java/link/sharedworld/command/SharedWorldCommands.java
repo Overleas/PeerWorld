@@ -100,12 +100,18 @@ public final class SharedWorldCommands {
                         .executes(context -> banMember(context, apiClient, hostingManager, ioExecutor, clientMainThreadExecutor))));
         dispatcher.register(Commands.literal("peerworld")
                 .requires(source -> SharedWorldDevSessionBridge.isHostingSharedWorld())
+                .executes(SharedWorldCommands::showHelpCommand)
+                .then(Commands.literal("help").executes(SharedWorldCommands::showHelpCommand))
+                .then(Commands.literal("info").executes(context -> showInfoCommand(context, hostingManager)))
                 .then(Commands.literal("backup")
                         .executes(context -> runBackupCommand(context, null, hostingManager))
                         .then(Commands.argument("name", StringArgumentType.greedyString())
                                 .executes(context -> runBackupCommand(context, StringArgumentType.getString(context, "name"), hostingManager)))));
         dispatcher.register(Commands.literal("pw")
                 .requires(source -> SharedWorldDevSessionBridge.isHostingSharedWorld())
+                .executes(SharedWorldCommands::showHelpCommand)
+                .then(Commands.literal("help").executes(SharedWorldCommands::showHelpCommand))
+                .then(Commands.literal("info").executes(context -> showInfoCommand(context, hostingManager)))
                 .then(Commands.literal("backup")
                         .executes(context -> runBackupCommand(context, null, hostingManager))
                         .then(Commands.argument("name", StringArgumentType.greedyString())
@@ -443,5 +449,35 @@ public final class SharedWorldCommands {
             return link.sharedworld.SharedWorldText.string("screen.sharedworld.error_generic");
         }
         return cause.getMessage();
+    }
+
+    private static int showHelpCommand(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+        source.sendSuccess(() -> Component.translatable("peerworld.command.help_header"), false);
+        source.sendSuccess(() -> Component.translatable("peerworld.command.help_backup"), false);
+        source.sendSuccess(() -> Component.translatable("peerworld.command.help_info"), false);
+        source.sendSuccess(() -> Component.translatable("peerworld.command.help_op"), false);
+        return 1;
+    }
+
+    private static int showInfoCommand(CommandContext<CommandSourceStack> context, Supplier<SharedWorldHostingManager> hostingManager) {
+        CommandSourceStack source = context.getSource();
+        SharedWorldHostingManager manager = hostingManager.get();
+        if (manager == null || !manager.isHosting()) {
+            source.sendFailure(Component.translatable("peerworld.command.not_hosting"));
+            return 0;
+        }
+        var world = manager.currentWorld();
+        String worldName = (world != null && world.name() != null) ? world.name() : "PeerWorld";
+        String tunnel = manager.publishedJoinTarget();
+        String tunnelDisplay = (tunnel != null && !tunnel.isBlank()) ? tunnel : "P2P";
+        int onlineCount = source.getServer().getPlayerCount();
+
+        source.sendSuccess(() -> Component.translatable("peerworld.command.info_header"), false);
+        source.sendSuccess(() -> Component.translatable("peerworld.command.info_world", worldName), false);
+        source.sendSuccess(() -> Component.translatable("peerworld.command.info_tunnel", tunnelDisplay), false);
+        source.sendSuccess(() -> Component.translatable("peerworld.command.info_players", String.valueOf(onlineCount)), false);
+        source.sendSuccess(() -> Component.translatable("peerworld.command.info_cloud"), false);
+        return 1;
     }
 }
