@@ -54,11 +54,12 @@ public final class ConfirmHostTakeoverScreen extends link.sharedworld.versioned.
     @Override
     protected void init() {
         int centerX = this.width / 2;
+        int buttonY = Math.min(this.height - 60, this.height / 2 + 35);
         this.addRenderableWidget(Button.builder(Component.translatable("screen.sharedworld.takeover_host"), button -> decide(this.accept))
-                .bounds(centerX - 100, this.height - 76, 200, 20)
+                .bounds(centerX - 100, buttonY, 200, 20)
                 .build());
         this.addRenderableWidget(Button.builder(Component.translatable("screen.sharedworld.takeover_decline"), button -> decide(this.decline))
-                .bounds(centerX - 100, this.height - 52, 200, 20)
+                .bounds(centerX - 100, buttonY + 24, 200, 20)
                 .build());
     }
 
@@ -83,14 +84,15 @@ public final class ConfirmHostTakeoverScreen extends link.sharedworld.versioned.
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         super.render(graphics, mouseX, mouseY, partialTick);
-        graphics.drawCenteredString(this.font, this.getTitle(), this.width / 2, 40, 0xFFFFFF);
+        int titleY = Math.max(30, this.height / 2 - 60);
+        graphics.drawCenteredString(this.font, this.getTitle(), this.width / 2, titleY, 0xFFFFFFFF);
         List<FormattedCharSequence> lines = this.font.split(
                 Component.translatable("screen.sharedworld.takeover_body", this.worldName == null ? "?" : this.worldName),
-                this.width - 80
+                Math.min(this.width - 60, 380)
         );
-        int y = 70;
+        int y = titleY + 22;
         for (FormattedCharSequence line : lines) {
-            graphics.drawCenteredString(this.font, line, this.width / 2, y, 0xC0C0C0);
+            graphics.drawCenteredString(this.font, line, this.width / 2, y, 0xFFC0C0C0);
             y += 12;
         }
         graphics.drawCenteredString(
@@ -98,7 +100,7 @@ public final class ConfirmHostTakeoverScreen extends link.sharedworld.versioned.
                 Component.translatable("screen.sharedworld.takeover_countdown", secondsUntilAutoDecline()),
                 this.width / 2,
                 y + 8,
-                0x808080
+                0xFF808080
         );
     }
 

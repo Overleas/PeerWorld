@@ -70,6 +70,8 @@ fn actor(uuid: &str, name: &str) -> SessionActor {
         player_name: name.into(),
         membership_active: true,
         ever_member: true,
+        hardware_score: None,
+        allow_auto_host: None,
     }
 }
 

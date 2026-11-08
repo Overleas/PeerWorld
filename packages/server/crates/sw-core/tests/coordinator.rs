@@ -97,6 +97,8 @@ fn actor(uuid: &str, name: &str) -> SessionActor {
         player_name: name.into(),
         membership_active: true,
         ever_member: true,
+        hardware_score: None,
+        allow_auto_host: None,
     }
 }
 
@@ -126,7 +128,11 @@ fn seed_members(h: &H) {
 }
 
 fn auth_of(a: &HostAssignment) -> HostAuthorityArgs {
-    HostAuthorityArgs { runtime_epoch: Some(a.runtime_epoch), host_token: Some(a.host_token.clone()) }
+    HostAuthorityArgs {
+        runtime_epoch: Some(a.runtime_epoch),
+        host_token: Some(a.host_token.clone()),
+        target_host_uuid: None,
+    }
 }
 
 fn hb(a: &HostAuthorityArgs, join_target: Option<&str>) -> HeartbeatArgs {
@@ -627,6 +633,8 @@ async fn access_control_codes() {
         player_name: "S".into(),
         membership_active: false,
         ever_member: false,
+        hardware_score: None,
+        allow_auto_host: None,
     };
     expect_err(h.coordinator.enter_session(&stranger, None, false, t0()).await, "forbidden", None);
     let kicked = SessionActor {
@@ -634,6 +642,8 @@ async fn access_control_codes() {
         player_name: "K".into(),
         membership_active: false,
         ever_member: true,
+        hardware_score: None,
+        allow_auto_host: None,
     };
     expect_err(h.coordinator.enter_session(&kicked, None, false, t0()).await, "membership_revoked", None);
 }

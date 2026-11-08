@@ -8,6 +8,12 @@
     "Overleas",
     "PeerWorld Contributors"
   ],
+  "contact": {
+    "homepage": "https://peerworld.link",
+    "sources": "https://github.com/overleas/peerworld",
+    "issues": "https://github.com/overleas/peerworld/issues"
+  },
+  "license": "MIT",
   "icon": "peerworld_icon.png",
   "environment": "client",
   "entrypoints": {

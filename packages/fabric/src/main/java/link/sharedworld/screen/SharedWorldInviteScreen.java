@@ -89,20 +89,14 @@ public final class SharedWorldInviteScreen extends link.sharedworld.versioned.Ve
         super.render(guiGraphics, mouseX, mouseY, partialTick);
     }
 
-    private static String formatFullInviteCode(String code) {
+    public static String formatFullInviteCode(String code) {
         String base = link.sharedworld.SharedWorldClientConfigStore.shared().configuredBackendBaseUrl();
-        if (base != null && !base.contains("127.0.0.1") && !base.contains("localhost")) {
+        if (base != null && !base.isBlank()
+                && !base.equalsIgnoreCase(link.sharedworld.SharedWorldBackendConstants.DEFAULT_BASE_URL)
+                && !base.replaceAll("/+$", "").equalsIgnoreCase(link.sharedworld.SharedWorldBackendConstants.DEFAULT_BASE_URL.replaceAll("/+$", ""))
+                && !base.contains("127.0.0.1") && !base.contains("localhost")) {
             return code + "@" + base;
         }
-        try {
-            java.nio.file.Path tunnelFile = link.sharedworld.platform.SharedWorldPlatform.get().configDir().resolve("sharedworld-tunnel.url");
-            if (java.nio.file.Files.exists(tunnelFile)) {
-                String tunnel = java.nio.file.Files.readString(tunnelFile).trim();
-                if (!tunnel.isBlank()) {
-                    return code + "@" + tunnel;
-                }
-            }
-        } catch (Exception ignored) {}
         return code;
     }
 

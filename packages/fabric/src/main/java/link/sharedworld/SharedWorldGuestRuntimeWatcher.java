@@ -160,6 +160,13 @@ public final class SharedWorldGuestRuntimeWatcher implements link.sharedworld.re
     }
 
     private void handleObservation(SharedWorldPlaySessionTracker.ActiveWorldSession session, WorldRuntimeStatusDto status) {
+        if (status != null && status.hostUuid() != null) {
+            String prevHost = link.sharedworld.host.SharedWorldHostIndicator.currentHostName();
+            link.sharedworld.host.SharedWorldHostIndicator.setCurrentHost(status.hostUuid(), status.hostPlayerName());
+            if (prevHost != null && status.hostPlayerName() != null && !prevHost.equalsIgnoreCase(status.hostPlayerName())) {
+                link.sharedworld.SharedWorldNotificationManager.notifyHostChanged(status.hostPlayerName(), false);
+            }
+        }
         if (this.departed || !session.worldId().equals(this.activeWorldId)) {
             return;
         }

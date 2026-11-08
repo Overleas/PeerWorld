@@ -41,6 +41,8 @@ final class EditWorldSettingsForm {
      */
     private static final Integer[] MAX_BACKUPS_STEPS = { null, 100, 50, 25, 10, 5, 3, 1 };
     private Integer maxBackups;
+    private int maxPlayers = 8;
+    private int loadedMaxPlayers = 8;
     private final EnumMap<SharedWorldGameRule, Boolean> rules = new EnumMap<>(SharedWorldGameRule.class);
     private WorldSettingsDto loadedSettings;
     private boolean prefillFailed;
@@ -48,6 +50,7 @@ final class EditWorldSettingsForm {
     private Button difficultyButton;
     private Button gameModeButton;
     private Button maxBackupsButton;
+    private MaxPlayersSlider maxPlayersSlider;
     private final EnumMap<SharedWorldGameRule, Button> ruleButtons = new EnumMap<>(SharedWorldGameRule.class);
 
     EditWorldSettingsForm(ManagedWorldStore worldStore, String worldId, BooleanSupplier editableByPlayer, Runnable onChanged) {
@@ -67,6 +70,14 @@ final class EditWorldSettingsForm {
         this.difficultyButton = Button.builder(Component.empty(), ignored -> this.cycleDifficulty()).width(220).build();
         this.gameModeButton = Button.builder(Component.empty(), ignored -> this.cycleGameMode()).width(220).build();
         this.maxBackupsButton = Button.builder(Component.empty(), ignored -> this.cycleMaxBackups()).width(220).build();
+        this.maxPlayersSlider = new MaxPlayersSlider(
+                0, 0, 220, 20,
+                this.maxPlayers,
+                val -> {
+                    this.maxPlayers = val;
+                    this.onChanged.run();
+                }
+        );
         this.ruleButtons.clear();
         for (SharedWorldGameRule rule : SharedWorldGameRule.values()) {
             this.ruleButtons.put(rule, Button.builder(Component.empty(), ignored -> this.toggleRule(rule)).width(220).build());
@@ -77,16 +88,21 @@ final class EditWorldSettingsForm {
         consumer.accept(this.difficultyButton);
         consumer.accept(this.gameModeButton);
         consumer.accept(this.maxBackupsButton);
+        consumer.accept(this.maxPlayersSlider);
         for (Button button : this.ruleButtons.values()) {
             consumer.accept(button);
         }
     }
 
+    static final int COLUMN_WIDTH = 180;
+    static final int COLUMN_GAP = 12;
+
     void layout(ScreenRectangle area) {
-        int columnWidth = Math.min(220, area.width() / 2 - 16);
-        int leftColumn = area.left() + (area.width() / 2 - columnWidth) / 2;
-        int rightColumn = area.left() + area.width() / 2 + (area.width() / 2 - columnWidth) / 2;
-        int top = area.top() + 34;
+        int columnWidth = Math.min(COLUMN_WIDTH, (area.width() - COLUMN_GAP - 20) / 2);
+        int totalWidth = columnWidth * 2 + COLUMN_GAP;
+        int leftColumn = area.left() + (area.width() - totalWidth) / 2;
+        int rightColumn = leftColumn + columnWidth + COLUMN_GAP;
+        int top = area.top() + Math.max(16, (area.height() - (5 * 24)) / 2);
 
         this.difficultyButton.setWidth(columnWidth);
         this.difficultyButton.setPosition(leftColumn, top);
@@ -94,6 +110,8 @@ final class EditWorldSettingsForm {
         this.gameModeButton.setPosition(leftColumn, top + 24);
         this.maxBackupsButton.setWidth(columnWidth);
         this.maxBackupsButton.setPosition(leftColumn, top + 48);
+        this.maxPlayersSlider.setWidth(columnWidth);
+        this.maxPlayersSlider.setPosition(leftColumn, top + 72);
 
         int y = top;
         for (Button button : this.ruleButtons.values()) {
@@ -109,6 +127,15 @@ final class EditWorldSettingsForm {
      * versions, unlike gamerule keys), then vanilla defaults.
      */
     void populate(WorldSettingsDto saved) {
+        populate(saved, 8);
+    }
+
+    void populate(WorldSettingsDto saved, int initialMaxPlayers) {
+        this.maxPlayers = initialMaxPlayers;
+        this.loadedMaxPlayers = initialMaxPlayers;
+        if (this.maxPlayersSlider != null) {
+            this.maxPlayersSlider.setPlayers(initialMaxPlayers);
+        }
         if (saved == null || saved.difficulty() == null || saved.defaultGameMode() == null) {
             this.prefillFromLevelDat();
         }
@@ -206,7 +233,9 @@ final class EditWorldSettingsForm {
     }
 
     boolean dirty() {
-        return this.loadedSettings != null && !this.currentDto().equals(this.loadedSettings);
+        boolean settingsDirty = this.loadedSettings != null && !this.currentDto().equals(this.loadedSettings);
+        boolean maxPlayersDirty = this.maxPlayers != this.loadedMaxPlayers;
+        return settingsDirty || maxPlayersDirty;
     }
 
     boolean prefillFailed() {
@@ -215,7 +244,16 @@ final class EditWorldSettingsForm {
 
     /** The given dto was accepted by the backend; it is the new clean baseline. */
     void markSaved(WorldSettingsDto dto) {
+        markSaved(dto, this.maxPlayers);
+    }
+
+    void markSaved(WorldSettingsDto dto, int savedMaxPlayers) {
         this.loadedSettings = dto;
+        this.loadedMaxPlayers = savedMaxPlayers;
+    }
+
+    int maxPlayers() {
+        return this.maxPlayers;
     }
 
     private void cycleDifficulty() {
@@ -263,6 +301,9 @@ final class EditWorldSettingsForm {
                                 ? Component.translatable("screen.sharedworld.settings_max_backups_none")
                                 : Component.literal(String.valueOf(this.maxBackups))));
         this.maxBackupsButton.active = editable;
+        if (this.maxPlayersSlider != null) {
+            this.maxPlayersSlider.active = editable;
+        }
         for (var entry : this.ruleButtons.entrySet()) {
             boolean value = Boolean.TRUE.equals(this.rules.get(entry.getKey()));
             entry.getValue().setMessage(Component.translatable(

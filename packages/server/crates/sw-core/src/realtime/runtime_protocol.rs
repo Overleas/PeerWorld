@@ -13,6 +13,10 @@ use crate::time::{self, Instant};
 pub struct RuntimeCandidate {
     pub player_uuid: String,
     pub player_name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hardware_score: Option<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub allow_auto_host: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -23,6 +27,10 @@ pub struct RuntimeWaiter {
     pub waiter_session_id: String,
     pub waiting: bool,
     pub updated_at: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hardware_score: Option<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub allow_auto_host: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -65,11 +73,14 @@ pub struct WorldRuntimeRecord {
 pub fn choose_preferred_candidate(
     waiters: &[RuntimeCandidate],
     memberships: &[RuntimeMembership],
+    designated: Option<&str>,
 ) -> Option<RuntimeCandidate> {
     struct C<'a> {
         uuid: &'a str,
         name: &'a str,
         owner: bool,
+        hardware_score: u8,
+        allow_auto_host: bool,
         joined_at: &'a str,
     }
     let mut candidates: Vec<C> = waiters
@@ -83,6 +94,8 @@ pub fn choose_preferred_candidate(
                 uuid: &w.player_uuid,
                 name: &m.player_name,
                 owner: m.role == MembershipRole::Owner,
+                hardware_score: w.hardware_score.unwrap_or(50),
+                allow_auto_host: w.allow_auto_host.unwrap_or(true),
                 joined_at: &m.joined_at,
             })
         })
@@ -90,12 +103,38 @@ pub fn choose_preferred_candidate(
     if candidates.is_empty() {
         return None;
     }
+    // If a specific target was designated by the transferring host and is in candidates, prefer them immediately
+    if let Some(target) = designated {
+        if let Some(c) = candidates.iter().find(|c| c.uuid == target) {
+            return Some(RuntimeCandidate {
+                player_uuid: c.uuid.to_string(),
+                player_name: c.name.to_string(),
+                hardware_score: Some(c.hardware_score),
+                allow_auto_host: Some(c.allow_auto_host),
+            });
+        }
+    }
+    // If any candidate has allow_auto_host enabled, prefer them
+    let any_auto = candidates.iter().any(|c| c.allow_auto_host);
+    if any_auto {
+        candidates.retain(|c| c.allow_auto_host);
+    }
     candidates.sort_by(|l, r| {
-        r.owner.cmp(&l.owner).then_with(|| l.joined_at.cmp(r.joined_at)).then_with(|| l.uuid.cmp(r.uuid))
+        let score_diff = (r.hardware_score as i16) - (l.hardware_score as i16);
+        if score_diff.abs() <= 2 && l.owner != r.owner {
+            return r.owner.cmp(&l.owner);
+        }
+        r.hardware_score
+            .cmp(&l.hardware_score)
+            .then_with(|| r.owner.cmp(&l.owner))
+            .then_with(|| l.joined_at.cmp(r.joined_at))
+            .then_with(|| l.uuid.cmp(r.uuid))
     });
     Some(RuntimeCandidate {
         player_uuid: candidates[0].uuid.to_string(),
         player_name: candidates[0].name.to_string(),
+        hardware_score: Some(candidates[0].hardware_score),
+        allow_auto_host: Some(candidates[0].allow_auto_host),
     })
 }
 

@@ -35,6 +35,8 @@ pub struct SessionActor {
     pub player_name: String,
     pub membership_active: bool,
     pub ever_member: bool,
+    pub hardware_score: Option<u8>,
+    pub allow_auto_host: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -65,6 +67,7 @@ pub struct ReleaseHostResult {
 pub struct HostAuthorityArgs {
     pub runtime_epoch: Option<i64>,
     pub host_token: Option<String>,
+    pub target_host_uuid: Option<String>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -115,6 +118,7 @@ pub struct WorldCoordinator {
     world_id: String,
     store: Box<dyn CoordinatorStore>,
     effects: Arc<dyn CoordinatorEffects>,
+    designated_candidate: Option<String>,
 }
 
 enum Immediate {
@@ -124,9 +128,6 @@ enum Immediate {
 
 fn immediate_entry_kind(resolved: &ResolvedRuntimeState, player_uuid: &str) -> Option<Immediate> {
     if runtime_allows_direct_connect(resolved) {
-        if resolved.runtime.as_ref().is_some_and(|r| r.host_uuid.as_deref() == Some(player_uuid)) {
-            return None;
-        }
         return Some(Immediate::Connect);
     }
     host_assignment_for_current_runtime(resolved, player_uuid).map(Immediate::CurrentHost)
@@ -151,7 +152,12 @@ fn candidate_from_runtime(runtime: &WorldRuntimeRecord) -> Option<RuntimeCandida
     if c != h {
         return None;
     }
-    Some(RuntimeCandidate { player_uuid: c.clone(), player_name: name.clone() })
+    Some(RuntimeCandidate {
+        player_uuid: c.clone(),
+        player_name: name.clone(),
+        hardware_score: None,
+        allow_auto_host: None,
+    })
 }
 
 fn finalization_result(
@@ -216,7 +222,7 @@ impl WorldCoordinator {
         store: Box<dyn CoordinatorStore>,
         effects: Arc<dyn CoordinatorEffects>,
     ) -> Self {
-        Self { world_id: world_id.into(), store, effects }
+        Self { world_id: world_id.into(), store, effects, designated_candidate: None }
     }
 
     pub fn world_id(&self) -> &str {
@@ -242,14 +248,7 @@ impl WorldCoordinator {
     ) -> HttpResult<SessionEntryDecision> {
         self.require_session_access(actor, false)?;
         let requested = sanitize_waiter_session_id(waiter_session_id);
-        let mut resolved = self.resolve(now).await?;
-
-        if resolved.runtime.as_ref().is_some_and(|r| r.host_uuid.as_deref() == Some(&actor.player_uuid)) {
-            if let Some(r) = resolved.runtime.clone() {
-                self.retire_runtime(&r, now).await?;
-                resolved = self.resolve(now).await?;
-            }
-        }
+        let resolved = self.resolve(now).await?;
 
         if let Some(immediate) = immediate_entry_kind(&resolved, &actor.player_uuid) {
             if let Some(id) = &requested {
@@ -298,6 +297,8 @@ impl WorldCoordinator {
                     &RuntimeCandidate {
                         player_uuid: actor.player_uuid.clone(),
                         player_name: actor.player_name.clone(),
+                        hardware_score: actor.hardware_score,
+                        allow_auto_host: actor.allow_auto_host,
                     },
                     &resolved,
                     now,
@@ -653,6 +654,9 @@ impl WorldCoordinator {
                         &actor.player_uuid,
                     )));
                 }
+                if let Some(target) = &request.target_host_uuid {
+                    self.designated_candidate = Some(target.clone());
+                }
                 self.retire_runtime(&runtime, now).await?;
                 self.store.clear_warning();
                 let after = self.resolve(now).await?;
@@ -712,6 +716,9 @@ impl WorldCoordinator {
         let runtime = runtime.unwrap();
         self.store.delete_waiter(&actor.player_uuid);
         if graceful {
+            if let Some(target) = &request.target_host_uuid {
+                self.designated_candidate = Some(target.clone());
+            }
             self.retire_runtime(&runtime, now).await?;
             self.store.clear_warning();
         } else {
@@ -984,7 +991,7 @@ impl WorldCoordinator {
 
     // ------------------------------------------------------------ lifecycle
 
-    /// P5: world deleted; drop every trace and tell the (former) members.
+    /// P5: world deleted — drop every trace and tell the (former) members.
     pub async fn destroy_world(&mut self, recipients: Vec<String>) -> HttpResult<()> {
         if let Some(host) = self.store.get_runtime().and_then(|r| r.host_uuid) {
             self.effects.set_host_watch(&self.world_id, &host, false).await;
@@ -1080,9 +1087,14 @@ impl WorldCoordinator {
         let electable: Vec<RuntimeCandidate> = self
             .electable_waiters(now)
             .into_iter()
-            .map(|w| RuntimeCandidate { player_uuid: w.player_uuid, player_name: w.player_name })
+            .map(|w| RuntimeCandidate {
+                player_uuid: w.player_uuid,
+                player_name: w.player_name,
+                hardware_score: w.hardware_score,
+                allow_auto_host: w.allow_auto_host,
+            })
             .collect();
-        let candidate = choose_preferred_candidate(&electable, &memberships);
+        let candidate = choose_preferred_candidate(&electable, &memberships, self.designated_candidate.as_deref());
         let mut before = self.store.get_runtime();
         if let Some(b) = &before {
             if matches!(b.phase, WorldRuntimePhase::HostStarting | WorldRuntimePhase::HostLive)
@@ -1127,13 +1139,22 @@ impl WorldCoordinator {
 
     /// Verify with a probe before declaring the host gone; repair link state
     /// when reachable. `Ok(None)` = genuinely unreachable; `Err` propagates
-    /// (renewal aborted, expiry skipped; the safe failure).
+    /// (renewal aborted, expiry skipped — the safe failure).
     async fn rescue_reachable_host(
         &mut self,
-        _runtime: &WorldRuntimeRecord,
-        _now: Instant,
+        runtime: &WorldRuntimeRecord,
+        now: Instant,
     ) -> HttpResult<Option<WorldRuntimeRecord>> {
-        Ok(None)
+        let last_seen =
+            self.effects.probe_host_reachability(runtime.host_uuid.as_deref().unwrap_or("")).await?;
+        let reachable = last_seen.is_some_and(|t| ms(now) - ms(t) < HOST_LIVE_LEASE_TIMEOUT_MS);
+        if !reachable {
+            return Ok(None);
+        }
+        let refreshed = refresh_live_runtime(runtime, None, now);
+        self.store.put_runtime(&refreshed);
+        self.store.set_host_link(&HostLink { connected: true, grace_deadline_at: None });
+        Ok(Some(refreshed))
     }
 
     async fn claim_host(
@@ -1142,10 +1163,11 @@ impl WorldCoordinator {
         resolved: &ResolvedRuntimeState,
         now: Instant,
     ) -> Assigned {
+        self.designated_candidate = None;
         let assigned =
             assign_host_starting(&self.world_id, candidate, epoch_baseline(resolved), now, random_id("rt"));
         self.store.put_runtime(&assigned.runtime);
-        // lastEpoch moves only on retire; a live epoch must not look released.
+        // lastEpoch moves only on retire — a live epoch must not look released.
         self.store.set_room_players(None);
         let connected = self.effects.set_host_watch(&self.world_id, &candidate.player_uuid, true).await;
         self.store.set_host_link(&HostLink { connected, grace_deadline_at: None });
@@ -1214,6 +1236,8 @@ impl WorldCoordinator {
             waiter_session_id: id.clone(),
             waiting: true,
             updated_at: time::to_iso(now),
+            hardware_score: actor.hardware_score,
+            allow_auto_host: actor.allow_auto_host,
         });
         (id, true)
     }
@@ -1230,10 +1254,14 @@ impl WorldCoordinator {
             .into_iter()
             .find(|w| w.player_uuid == actor.player_uuid && w.waiter_session_id == waiter_session_id);
         let Some(existing) = existing else { return false };
+        let hardware_score = actor.hardware_score.or(existing.hardware_score);
+        let allow_auto_host = actor.allow_auto_host.or(existing.allow_auto_host);
         self.store.upsert_waiter(&RuntimeWaiter {
             player_name: actor.player_name.clone(),
             waiting: true,
             updated_at: time::to_iso(now),
+            hardware_score,
+            allow_auto_host,
             ..existing
         });
         true
@@ -1358,9 +1386,14 @@ impl WorldCoordinator {
         let electable: Vec<RuntimeCandidate> = self
             .electable_waiters(now)
             .into_iter()
-            .map(|w| RuntimeCandidate { player_uuid: w.player_uuid, player_name: w.player_name })
+            .map(|w| RuntimeCandidate {
+                player_uuid: w.player_uuid,
+                player_name: w.player_name,
+                hardware_score: w.hardware_score,
+                allow_auto_host: w.allow_auto_host,
+            })
             .collect();
-        let candidate = choose_preferred_candidate(&electable, &memberships);
+        let candidate = choose_preferred_candidate(&electable, &memberships, self.designated_candidate.as_deref());
         let warning = self.store.get_warning();
         let status =
             to_runtime_status(&self.world_id, runtime.as_ref(), candidate.as_ref(), warning.as_ref());

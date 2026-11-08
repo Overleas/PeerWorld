@@ -29,6 +29,8 @@ pub async fn session_actor_of(
         player_name: ctx.player_name.clone(),
         membership_active: facts.membership_active,
         ever_member: facts.ever_member,
+        hardware_score: None,
+        allow_auto_host: None,
     })
 }
 

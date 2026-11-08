@@ -151,6 +151,14 @@ public final class SharedWorldSessionCoordinator {
         if (this.pendingJoinAttempt != null && this.pendingJoinAttempt.worldId.equals(world.id())) {
             return;
         }
+        if ("idle".equals(world.status()) && !link.sharedworld.SharedWorldClientConfigStore.shared().allowAutoHost()) {
+            this.clientShell.setScreen(new link.sharedworld.screen.ConfirmOfflineHostScreen(
+                    parent,
+                    SharedWorldText.displayWorldName(world),
+                    () -> beginJoinAttempt(parent, world.id(), SharedWorldText.displayWorldName(world), world.ownerUuid(), null, false, false, false, null, SharedWorldHostingManager.StartupMode.NORMAL)
+            ));
+            return;
+        }
         beginJoinAttempt(parent, world.id(), SharedWorldText.displayWorldName(world), world.ownerUuid(), null, false, false, false, null, SharedWorldHostingManager.StartupMode.NORMAL);
     }
 
@@ -172,6 +180,8 @@ public final class SharedWorldSessionCoordinator {
     }
 
     private void beginJoinAttempt(Screen parent, String worldId, String worldName, String ownerUuid, String previousJoinTarget, boolean hostChangeFlow, boolean returnToSharedWorldMenu, boolean acknowledgeUncleanShutdown, RecoveryFingerprint resumedRecoveryFingerprint, SharedWorldHostingManager.StartupMode startupMode, boolean automaticTakeover) {
+        this.consecutiveFailedConnects = 0;
+        this.lastFailedTarget = null;
         PendingJoinAttempt attempt = new PendingJoinAttempt(
                 ++this.joinAttemptCounter,
                 worldId,
@@ -275,6 +285,8 @@ public final class SharedWorldSessionCoordinator {
     }
 
     public void cancelWaiting() {
+        this.consecutiveFailedConnects = 0;
+        this.lastFailedTarget = null;
         WaitingFlowState state = this.waitingState;
         if (state == null || state.cancelInFlight) {
             return;
@@ -396,6 +408,7 @@ public final class SharedWorldSessionCoordinator {
         // continuity is the feature. The guards above are what prevent the
         // auto-host-from-the-menu bug; the confirmation is reserved for
         // crash-RESUMED waits, where the intent may be days old.
+        boolean autoTakeover = !link.sharedworld.SharedWorldClientConfigStore.shared().allowAutoHost();
         beginJoinAttempt(
                 parent,
                 worldId,
@@ -407,9 +420,32 @@ public final class SharedWorldSessionCoordinator {
                 false,
                 null,
                 SharedWorldHostingManager.StartupMode.NORMAL,
-                false
+                autoTakeover
         );
         return true;
+    }
+
+    public void beginHandoffRejoin(Screen parent, String worldId, String worldName) {
+        if (worldId == null || worldId.isBlank()) {
+            return;
+        }
+        this.clientShell.disconnectFromWorld();
+        this.clientShell.clearPlaySession();
+        this.clientShell.setScreen(this.sessionUi.waiting(parent, worldId, worldName, null));
+        boolean autoTakeover = !link.sharedworld.SharedWorldClientConfigStore.shared().allowAutoHost();
+        beginJoinAttempt(
+                parent,
+                worldId,
+                worldName,
+                null,
+                null,
+                true,
+                true,
+                false,
+                null,
+                SharedWorldHostingManager.StartupMode.NORMAL,
+                autoTakeover
+        );
     }
 
     /** A kicked/banned guest must not resume; drop the persisted disconnect-recovery record. */
@@ -417,8 +453,28 @@ public final class SharedWorldSessionCoordinator {
         this.recoveryStore.clear();
     }
 
+    private String lastFailedTarget = null;
+    private int consecutiveFailedConnects = 0;
+
     public void startWaitingFlowFromFailedConnect(Screen parent, String worldId, String worldName, String failedJoinTarget) {
-        startWaitingFlow(parent, worldId, worldName, null, failedJoinTarget, null, true, true, false);
+        if (failedJoinTarget != null && failedJoinTarget.equals(this.lastFailedTarget)) {
+            this.consecutiveFailedConnects++;
+        } else {
+            this.lastFailedTarget = failedJoinTarget;
+            this.consecutiveFailedConnects = 1;
+        }
+        if (this.consecutiveFailedConnects > 3) {
+            LOGGER.warn("SharedWorld connect retries exhausted for target {}", failedJoinTarget);
+            this.consecutiveFailedConnects = 0;
+            this.lastFailedTarget = null;
+            clearPersistedRecovery();
+            this.clientShell.setScreen(this.sessionUi.joinError(
+                    parent,
+                    new IllegalStateException(link.sharedworld.SharedWorldText.string("screen.sharedworld.hosting_lost_join_target"))
+            ));
+            return;
+        }
+        startWaitingFlow(parent, worldId, worldName, null, failedJoinTarget, null, false, true, false);
     }
 
     public boolean openRecoveryScreenIfPresent(Screen fallbackParent) {
@@ -543,6 +599,12 @@ public final class SharedWorldSessionCoordinator {
         if ("connect".equals(result.action())) {
             String target = result.runtime() != null ? result.runtime().joinTarget() : null;
             if (target != null && !target.isBlank()) {
+                if (result.runtime() != null) {
+                    link.sharedworld.host.SharedWorldHostIndicator.setCurrentHost(
+                            result.runtime().hostUuid(),
+                            result.runtime().hostPlayerName()
+                    );
+                }
                 String hostVersion = result.runtime().hostMinecraftVersion();
                 String localVersion = link.sharedworld.versioned.ClientCompat.currentMinecraftVersion();
                 if (link.sharedworld.host.WorldVersionGatePolicy.decideGuestJoin(hostVersion, localVersion)
@@ -560,11 +622,22 @@ public final class SharedWorldSessionCoordinator {
         }
         if ("host".equals(result.action()) && result.assignment() != null) {
             clearPersistedRecoveryIfMatches(resumedRecoveryFingerprint);
+            Minecraft mc = Minecraft.getInstance();
+            if (mc != null && mc.getUser() != null) {
+                link.sharedworld.host.SharedWorldHostIndicator.setCurrentHost(
+                        mc.getUser().getProfileId(),
+                        mc.getUser().getName()
+                );
+                if (hostChangeFlow) {
+                    link.sharedworld.SharedWorldNotificationManager.notifyHostChanged(
+                            mc.getUser().getName(),
+                            true
+                    );
+                }
+            }
             if (automaticTakeover) {
                 // The player never asked to host; they were pulled here by a
-                // host-departure rejoin. The backend has already assigned the
-                // lease, so this is a real decision: host, or hand the lease
-                // back (gracefully, so the next waiter is elected).
+                // host-departure rejoin or an automatic election.
                 this.clientShell.setScreen(this.sessionUi.confirmTakeover(
                         parent,
                         worldName,
@@ -739,11 +812,23 @@ public final class SharedWorldSessionCoordinator {
                 if (state.previousJoinTarget != null && !state.previousJoinTarget.isBlank()
                         && decision.connectTarget() != null
                         && decision.connectTarget().equalsIgnoreCase(state.previousJoinTarget)) {
-                    LOGGER.info("SharedWorld observeWaiting returned previous join target ({}); remaining in waiting flow.", decision.connectTarget());
-                    return;
+                    if (state.hostChangeFlow) {
+                        LOGGER.info("SharedWorld observeWaiting returned previous join target ({}); remaining in waiting flow.", decision.connectTarget());
+                        return;
+                    }
+                    long now = this.clock.nowMillis();
+                    if (now - state.waitingStartedAt < 2000L) {
+                        return;
+                    }
                 }
                 this.waitingState = null;
                 clearPersistedRecovery();
+                if (decision.runtimeStatus() != null) {
+                    link.sharedworld.host.SharedWorldHostIndicator.setCurrentHost(
+                            decision.runtimeStatus().hostUuid(),
+                            decision.runtimeStatus().hostPlayerName()
+                    );
+                }
                 beginConnectHandoff(state.parent, state.worldId, state.worldName, decision.runtimeEpoch(), decision.connectTarget(), null);
             }
             case RESTART -> restartWaitingAttempt(state);

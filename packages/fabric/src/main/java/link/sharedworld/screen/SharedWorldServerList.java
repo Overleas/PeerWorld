@@ -155,7 +155,7 @@ public final class SharedWorldServerList extends link.sharedworld.versioned.Vers
                     this.getX(),
                     this.getY(),
                     SharedWorldText.displayWorldName(this.world),
-                    this.world.motd(),
+                    this.world.displayMotd(),
                     playerCount(this.world),
                     this.statusIcon
             );
@@ -342,7 +342,10 @@ public final class SharedWorldServerList extends link.sharedworld.versioned.Vers
     }
 
     private static Component playerCount(WorldSummaryDto world) {
-        return SharedWorldText.playerCount(world.onlinePlayerCount(), 8);
+        int max = (SharedWorldClient.hostingManager() != null && SharedWorldClient.hostingManager().isHosting(world.id()))
+                ? link.sharedworld.host.SharedWorldHostingManager.effectiveMaxPlayers()
+                : world.maxPlayers();
+        return SharedWorldText.playerCount(world.onlinePlayerCount(), max);
     }
 
     private static List<Component> onlinePlayersTooltip(WorldSummaryDto world) {

@@ -334,8 +334,39 @@ impl StorageProvider for FakeDriveProvider {
         Some(self)
     }
 
+    fn relay(&self, _binding: &StorageBinding) -> Option<&dyn sw_core::relay::RelayCapable> {
+        Some(self)
+    }
+
     fn account_cleanup(&self, _binding: &StorageBinding) -> Option<&dyn AccountCleanupCapable> {
         Some(self)
+    }
+}
+
+#[async_trait]
+impl sw_core::relay::RelayCapable for FakeDriveProvider {
+    async fn relay_grant(
+        &self,
+        binding: &StorageBinding,
+        storage_keys: &[String],
+    ) -> HttpResult<sw_core::relay::RelayGrant> {
+        let account = Self::account_of(binding)?;
+        if self.read_auth_dead_accounts.lock().contains(&account) {
+            return Err(HttpError::new(
+                401,
+                "drive_reauth_required",
+                "Google Drive authorization needs to be refreshed.",
+            ));
+        }
+        let rows = self
+            .repo
+            .get_storage_objects_batch(StorageProviderType::GoogleDrive, &account, storage_keys)
+            .await?;
+        Ok(sw_core::relay::RelayGrant {
+            access_token: "ya29.fake-drive-test-token".to_string(),
+            access_token_expires_at_ms: sw_core::time::to_millis(sw_core::time::now()) + 3600 * 1000,
+            file_ids: rows.into_iter().map(|r| (r.storage_key, r.object_id)).collect(),
+        })
     }
 }
 

@@ -78,6 +78,9 @@ public final class SharedWorldReleaseStore implements SharedWorldReleaseCoordina
         public int autoRetryCount;
         public String createdAt;
         public String updatedAt;
+        public String targetHostUuid;
+        public String targetHostName;
+        public boolean handoffRejoinExpected;
 
         public ReleaseRecord copy() {
             ReleaseRecord copy = new ReleaseRecord();
@@ -97,6 +100,9 @@ public final class SharedWorldReleaseStore implements SharedWorldReleaseCoordina
             copy.autoRetryCount = this.autoRetryCount;
             copy.createdAt = this.createdAt;
             copy.updatedAt = this.updatedAt;
+            copy.targetHostUuid = this.targetHostUuid;
+            copy.targetHostName = this.targetHostName;
+            copy.handoffRejoinExpected = this.handoffRejoinExpected;
             return copy;
         }
     }

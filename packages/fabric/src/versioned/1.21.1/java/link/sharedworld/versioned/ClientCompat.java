@@ -93,4 +93,52 @@ public final class ClientCompat {
             minecraft.player.displayClientMessage(message, false);
         }
     }
+
+    /** Show a system toast on the local client (migration, backup, player join notifications). */
+    public static void showToast(Minecraft minecraft, net.minecraft.network.chat.Component title, net.minecraft.network.chat.Component message) {
+        if (minecraft != null && minecraft.getToasts() != null) {
+            net.minecraft.client.gui.components.toasts.SystemToast.add(
+                    minecraft.getToasts(),
+                    net.minecraft.client.gui.components.toasts.SystemToast.SystemToastId.PERIODIC_NOTIFICATION,
+                    title,
+                    message
+            );
+        }
+    }
+
+    /** Show an actionbar overlay message above the hotbar. */
+    public static void showOverlayMessage(Minecraft minecraft, net.minecraft.network.chat.Component message) {
+        if (minecraft != null && minecraft.player != null) {
+            minecraft.player.displayClientMessage(message, true);
+        }
+    }
+
+    @FunctionalInterface
+    public interface NewWorldCreatedCallback {
+        void onWorldCreated(String worldName, java.nio.file.Path worldDirectory);
+    }
+
+    public static void openCreateWorldScreen(
+            Minecraft minecraft,
+            Runnable onCancel,
+            NewWorldCreatedCallback callback
+    ) {
+        net.minecraft.client.gui.screens.worldselection.CreateWorldScreen.openFresh(minecraft, currentScreen(minecraft));
+    }
+
+    public static void sendResourcePack(net.minecraft.server.level.ServerPlayer player, java.util.UUID packId, String url, String hash, boolean required, net.minecraft.network.chat.Component prompt) {
+        if (player != null && player.connection != null) {
+            player.connection.send(new net.minecraft.network.protocol.common.ClientboundResourcePackPushPacket(
+                    packId != null ? packId : java.util.UUID.randomUUID(),
+                    url,
+                    hash != null ? hash : "",
+                    required,
+                    java.util.Optional.ofNullable(prompt)
+            ));
+        }
+    }
+
+    public static int playerLatency(net.minecraft.server.level.ServerPlayer player) {
+        return player != null && player.connection != null ? player.connection.latency() : -1;
+    }
 }

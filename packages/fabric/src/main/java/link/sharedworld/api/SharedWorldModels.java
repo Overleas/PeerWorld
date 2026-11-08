@@ -75,6 +75,22 @@ public final class SharedWorldModels {
                     onlinePlayerCount, onlinePlayerNames, storageProvider, storageLinked, storageAccountEmail,
                     null, null);
         }
+
+        public String displayMotd() {
+            return link.sharedworld.screen.SharedWorldMetadataFormat.cleanMotd(this.motd);
+        }
+
+        public int maxPlayers() {
+            return link.sharedworld.screen.SharedWorldMetadataFormat.extractMaxPlayers(this.motd);
+        }
+
+        public String resourcePackUrl() {
+            return link.sharedworld.screen.SharedWorldMetadataFormat.extractResourcePackUrl(this.motd);
+        }
+
+        public boolean resourcePackRequired() {
+            return link.sharedworld.screen.SharedWorldMetadataFormat.extractResourcePackRequired(this.motd);
+        }
     }
 
     public record WorldMembershipDto(
@@ -145,6 +161,22 @@ public final class SharedWorldModels {
                     lastSnapshotId, lastSnapshotAt, activeHostUuid, activeHostPlayerName, activeJoinTarget,
                     onlinePlayerCount, onlinePlayerNames, storageProvider, storageLinked, storageAccountEmail,
                     membership, memberships, storageUsage, activeInviteCode, null, null);
+        }
+
+        public String displayMotd() {
+            return link.sharedworld.screen.SharedWorldMetadataFormat.cleanMotd(this.motd);
+        }
+
+        public int maxPlayers() {
+            return link.sharedworld.screen.SharedWorldMetadataFormat.extractMaxPlayers(this.motd);
+        }
+
+        public String resourcePackUrl() {
+            return link.sharedworld.screen.SharedWorldMetadataFormat.extractResourcePackUrl(this.motd);
+        }
+
+        public boolean resourcePackRequired() {
+            return link.sharedworld.screen.SharedWorldMetadataFormat.extractResourcePackRequired(this.motd);
         }
     }
 

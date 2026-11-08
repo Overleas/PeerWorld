@@ -59,7 +59,7 @@ public final class SharedWorldClientConfigStore {
 
     public synchronized String configuredBackendBaseUrl() {
         String configured = normalizeBaseUrl(this.state.backend.baseUrl);
-        if (configured == null || configured.contains("api.sharedworld.net")) {
+        if (configured == null || configured.contains("api.sharedworld.net") || configured.contains("sharedworld-server.onrender.com")) {
             return SharedWorldBackendConstants.DEFAULT_BASE_URL;
         }
         return configured;
@@ -71,12 +71,15 @@ public final class SharedWorldClientConfigStore {
     }
 
     public String resolvedBackendBaseUrl() {
-        String override = normalizeBaseUrl(System.getProperty(SharedWorldBackendConstants.BACKEND_URL_SYSTEM_PROPERTY));
+        String override = normalizeBaseUrl(System.getProperty(SharedWorldBackendConstants.PEERWORLD_BACKEND_URL_SYSTEM_PROPERTY));
+        if (override == null) {
+            override = normalizeBaseUrl(System.getProperty(SharedWorldBackendConstants.BACKEND_URL_SYSTEM_PROPERTY));
+        }
         if (override != null) {
             return override;
         }
         String configured = normalizeBaseUrl(this.state.backend.baseUrl);
-        if (configured != null && !configured.contains("api.sharedworld.net")) {
+        if (configured != null && !configured.contains("api.sharedworld.net") && !configured.contains("sharedworld-server.onrender.com")) {
             return configured;
         }
         return configuredBackendBaseUrl();
@@ -115,12 +118,40 @@ public final class SharedWorldClientConfigStore {
         save();
     }
 
+    public synchronized boolean allowAutoHost() {
+        return this.state.hosting.allowAutoHost;
+    }
+
+    public synchronized void setAllowAutoHost(boolean allow) {
+        this.state.hosting.allowAutoHost = allow;
+        save();
+    }
+
     public synchronized int autosaveIntervalMinutes() {
-        return this.state.hosting.autosaveIntervalMinutes <= 0 ? 15 : this.state.hosting.autosaveIntervalMinutes;
+        return this.state.hosting.autosaveIntervalMinutes <= 0 ? 5 : this.state.hosting.autosaveIntervalMinutes;
     }
 
     public synchronized void setAutosaveIntervalMinutes(int minutes) {
         this.state.hosting.autosaveIntervalMinutes = Math.max(1, minutes);
+        save();
+    }
+
+    public synchronized int backupIntervalMinutes() {
+        return this.state.hosting.backupIntervalMinutes < 0 ? 45 : this.state.hosting.backupIntervalMinutes;
+    }
+
+    public synchronized void setBackupIntervalMinutes(int minutes) {
+        this.state.hosting.backupIntervalMinutes = Math.max(0, minutes);
+        save();
+    }
+
+    public synchronized int maxPlayers() {
+        return this.state.hosting.maxPlayers < 2 ? 8 : this.state.hosting.maxPlayers;
+    }
+
+    public synchronized void setMaxPlayers(int count) {
+        int clamped = Math.max(2, Math.min(64, (count / 2) * 2));
+        this.state.hosting.maxPlayers = clamped;
         save();
     }
 
@@ -166,6 +197,15 @@ public final class SharedWorldClientConfigStore {
         JsonObject object = parsed.getAsJsonObject();
         if (object.has("backend") || object.has("ui") || object.has("advanced") || object.has("hosting")) {
             ClientConfig loaded = GSON.fromJson(object, ClientConfig.class);
+            if (loaded != null && loaded.hosting != null && object.has("hosting") && object.get("hosting").isJsonObject()) {
+                JsonObject hostingObj = object.getAsJsonObject("hosting");
+                if (!hostingObj.has("backupIntervalMinutes")) {
+                    loaded.hosting.backupIntervalMinutes = 45;
+                }
+                if (!hostingObj.has("maxPlayers")) {
+                    loaded.hosting.maxPlayers = 8;
+                }
+            }
             return loaded == null ? new ClientConfig() : loaded;
         }
 
@@ -191,6 +231,12 @@ public final class SharedWorldClientConfigStore {
         }
         if (sanitized.hosting == null) {
             sanitized.hosting = new HostingConfig();
+        }
+        if (sanitized.hosting.backupIntervalMinutes < 0) {
+            sanitized.hosting.backupIntervalMinutes = 45;
+        }
+        if (sanitized.hosting.maxPlayers < 2 || sanitized.hosting.maxPlayers > 64) {
+            sanitized.hosting.maxPlayers = 8;
         }
         sanitized.hosting.customJoinAddress = normalizeCustomJoinAddress(sanitized.hosting.customJoinAddress);
         return sanitized;
@@ -243,7 +289,10 @@ public final class SharedWorldClientConfigStore {
     private static final class HostingConfig {
         private String customJoinAddress;
         private boolean allowOfflinePlayers = true;
-        private int autosaveIntervalMinutes = 15;
+        private boolean allowAutoHost = true;
+        private int autosaveIntervalMinutes = 5;
+        private int backupIntervalMinutes = 45;
+        private int maxPlayers = 8;
     }
 
     private static final class BackendConfig {

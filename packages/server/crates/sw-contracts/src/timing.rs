@@ -1,7 +1,7 @@
 //! Timing constants (`contracts.ts:1-19`). Mirrored by the Java client
 //! (`test/parity/timing-constants.test.ts`).
 
-pub const HOST_HEARTBEAT_INTERVAL_MS: i64 = 30_000;
+pub const HOST_HEARTBEAT_INTERVAL_MS: i64 = 25_000;
 pub const HOST_LEASE_TIMEOUT_MS: i64 = 90_000;
 /// Steady-state host-LIVE lease only (see the TS doc comment: it sets the
 /// coordinator's self-wake cadence; startup/finalizing stay on the 90 s one).

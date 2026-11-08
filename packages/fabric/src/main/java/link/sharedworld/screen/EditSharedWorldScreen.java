@@ -51,9 +51,10 @@ public final class EditSharedWorldScreen extends VersionedScreen {
     private final HeaderAndFooterLayout layout = new HeaderAndFooterLayout(this, 0, FOOTER_HEIGHT);
     private final TabManager tabManager = new TabManager(this::addRenderableWidget, this::removeWidget);
 
-    private static final int TAB_COUNT = 5;
+    private static final int TAB_COUNT = 6;
     private final DetailsTab detailsTab = new DetailsTab();
     private final SettingsTab settingsTab = new SettingsTab();
+    private final PacksTab packsTab = new PacksTab();
     private final BackupsTab backupsTab = new BackupsTab();
     private final MembersTab membersTab = new MembersTab();
     private final StorageTab storageTab = new StorageTab();
@@ -79,7 +80,9 @@ public final class EditSharedWorldScreen extends VersionedScreen {
     private Button selectAllBackupsButton;
     private Button primaryButton;
     private final EditWorldSettingsForm settingsForm;
+    private final EditWorldPacksForm packsForm;
     private boolean savingSettings;
+    private boolean savingPacks;
 
     private SelectedIcon selectedIcon;
     private boolean clearCustomIcon;
@@ -104,6 +107,7 @@ public final class EditSharedWorldScreen extends VersionedScreen {
                 runnable -> ScreenGuards.runIfCurrent(this, runnable)
         );
         this.settingsForm = new EditWorldSettingsForm(this.worldStore, world.id(), this::isOwner, this::updateButtons);
+        this.packsForm = new EditWorldPacksForm(this.worldStore, world.id(), this::isOwner, this::updateButtons);
     }
 
     @Override
@@ -147,8 +151,9 @@ public final class EditSharedWorldScreen extends VersionedScreen {
         this.memberList = link.sharedworld.versioned.LayoutCompat.registerTabList(
                 new MemberBrowserList(this.minecraft, 120, 100, 0, 36, this), this::addRenderableWidget);
         this.settingsForm.createWidgets();
+        this.packsForm.createWidgets(this.font);
 
-        this.tabNavigationBar = link.sharedworld.versioned.TabBarCompat.create(this.tabManager, this.width, this.detailsTab, this.settingsTab, this.backupsTab, this.membersTab, this.storageTab);
+        this.tabNavigationBar = link.sharedworld.versioned.TabBarCompat.create(this.tabManager, this.width, this.detailsTab, this.settingsTab, this.packsTab, this.backupsTab, this.membersTab, this.storageTab);
         this.addRenderableWidget(this.tabNavigationBar);
 
         if (this.details == null) {
@@ -287,6 +292,8 @@ public final class EditSharedWorldScreen extends VersionedScreen {
             this.renderDetailsDecorations(guiGraphics);
         } else if (this.tabManager.getCurrentTab() == this.settingsTab) {
             this.renderSettingsDecorations(guiGraphics);
+        } else if (this.tabManager.getCurrentTab() == this.packsTab) {
+            this.renderPacksDecorations(guiGraphics);
         } else if (this.tabManager.getCurrentTab() == this.backupsTab) {
             this.renderBackupsDecorations(guiGraphics);
         } else if (this.tabManager.getCurrentTab() == this.membersTab) {
@@ -296,30 +303,30 @@ public final class EditSharedWorldScreen extends VersionedScreen {
         }
     }
 
+    private void renderPacksDecorations(GuiGraphics guiGraphics) {
+        this.packsForm.renderDecorations(guiGraphics, this.font);
+    }
+
     private void renderSettingsDecorations(GuiGraphics guiGraphics) {
-        int top = this.contentArea.top();
-        // Under the two-button left column, wrapped to that column's width so
-        // it can never run into the gamerule toggles on the right.
-        int columnWidth = Math.min(220, this.contentArea.width() / 2 - 16);
-        int leftColumn = this.contentArea.left() + (this.contentArea.width() / 2 - columnWidth) / 2;
+        int columnWidth = Math.min(EditWorldSettingsForm.COLUMN_WIDTH, (this.contentArea.width() - EditWorldSettingsForm.COLUMN_GAP - 20) / 2);
+        int totalWidth = columnWidth * 2 + EditWorldSettingsForm.COLUMN_GAP;
+        int leftColumn = this.contentArea.left() + (this.contentArea.width() - totalWidth) / 2;
+        int top = this.contentArea.top() + Math.max(16, (this.contentArea.height() - (5 * 24)) / 2);
         if (!this.isOwner()) {
             WrappedText.draw(guiGraphics, this.font, Component.translatable("screen.sharedworld.settings_owner_only"),
                     leftColumn,
-                    top + 14,
-                    this.contentArea.width() - 76,
+                    top - 14,
+                    totalWidth,
                     0xFFFFD37A
             );
         }
         int doomed = this.settingsForm.backupsDeletedBySave(this.snapshots.size());
         if (doomed > 0) {
-            // Under the max-backups button (third row of the left column): the
-            // one thing worth a warning here; lowering the cap below what is
-            // stored deletes backups the moment the settings are saved.
             WrappedText.draw(guiGraphics, this.font, doomed == 1
                             ? Component.translatable("screen.sharedworld.settings_max_backups_lower_warning_one")
                             : Component.translatable("screen.sharedworld.settings_max_backups_lower_warning", doomed),
                     leftColumn,
-                    top + 34 + 72 + 6,
+                    top + 48 + 24 + 6,
                     columnWidth,
                     0xFFFFD37A
             );
@@ -327,24 +334,35 @@ public final class EditSharedWorldScreen extends VersionedScreen {
     }
 
     private void renderDetailsDecorations(GuiGraphics guiGraphics) {
-        int left = this.contentArea.left() + 38;
-        int top = this.contentArea.top();
+        if (this.contentArea == null || this.nameBox == null || this.motdBox == null) {
+            return;
+        }
+
+        ScreenRectangle area = this.contentArea;
+        int formLeft = WorldPreviewCard.formLeft(area);
+        int fieldsX = WorldPreviewCard.fieldsX(area);
         int iconX = this.iconAreaX();
         int iconY = this.iconAreaY();
+        int cardY = this.previewCardY();
+        boolean isOwner = this.isOwner();
 
-        guiGraphics.drawString(this.font, Component.translatable("screen.sharedworld.world_name"), left, top + 10, 0xFFA0A0A0);
-        guiGraphics.drawString(this.font, Component.translatable("screen.sharedworld.motd"), left, top + 58, 0xFFA0A0A0);
-        WorldPreviewCard.renderIconWell(guiGraphics, this.previewTexture, iconX, iconY, this.isOwner(), this.iconHovered, this.selectedIcon != null || this.hasCurrentCustomIcon());
-        WorldPreviewCard.renderCard(guiGraphics, this.font, this.previewTexture, WorldPreviewCard.cardX(this.contentArea), this.previewCardY(), this.previewWorldName(), this.previewMotd());
+        guiGraphics.drawString(this.font, Component.translatable("screen.sharedworld.world_name"), fieldsX, this.nameBox.getY() - 12, 0xFFA0A0A0);
         if (this.shouldShowDetailsValidation()) {
+            int nameLabelWidth = this.font.width(Component.translatable("screen.sharedworld.world_name"));
             guiGraphics.drawString(
                     this.font,
                     Component.translatable("screen.sharedworld.validation_world_name_short"),
-                    left,
-                    link.sharedworld.versioned.WidgetCompat.bottom(this.nameBox) + 6,
+                    fieldsX + nameLabelWidth + 6,
+                    this.nameBox.getY() - 12,
                     0xFFFF5555
             );
         }
+        guiGraphics.drawString(this.font, Component.translatable("screen.sharedworld.motd"), fieldsX, this.motdBox.getY() - 12, 0xFFA0A0A0);
+
+        WorldPreviewCard.renderIconWell(guiGraphics, this.previewTexture, iconX, iconY, isOwner, this.iconHovered, this.selectedIcon != null || this.hasCurrentCustomIcon());
+
+        guiGraphics.drawString(this.font, Component.translatable("screen.sharedworld.preview_card"), formLeft, cardY - 12, 0xFFA0A0A0);
+        WorldPreviewCard.renderCard(guiGraphics, this.font, this.previewTexture, formLeft, cardY, this.previewWorldName(), this.previewMotd());
     }
 
     private void renderBackupsDecorations(GuiGraphics guiGraphics) {
@@ -517,6 +535,15 @@ public final class EditSharedWorldScreen extends VersionedScreen {
                     : "screen.sharedworld.save_settings"));
             this.primaryButton.active = !this.loading && !this.actionInFlight && this.isOwner() && this.settingsForm.dirty() && !this.savingSettings;
             this.settingsForm.updateWidgets(this.isOwner() && !this.loading && !this.actionInFlight && !this.savingSettings);
+        } else if (currentTab == this.packsTab) {
+            this.primaryButton.visible = true;
+            this.secondaryButton.visible = false;
+            this.secondaryButton.active = false;
+            this.primaryButton.setMessage(Component.translatable(this.savingPacks
+                    ? "screen.sharedworld.saving"
+                    : "screen.sharedworld.packs_save"));
+            this.primaryButton.active = !this.loading && !this.actionInFlight && this.isOwner() && this.packsForm.dirty() && !this.savingPacks;
+            this.packsForm.updateWidgets(this.isOwner() && !this.loading && !this.actionInFlight && !this.savingPacks);
         } else {
             this.primaryButton.visible = false;
             this.primaryButton.active = false;
@@ -596,6 +623,10 @@ public final class EditSharedWorldScreen extends VersionedScreen {
             this.saveSettings();
             return;
         }
+        if (currentTab == this.packsTab) {
+            this.savePacks();
+            return;
+        }
     }
 
     private void onSecondaryAction() {
@@ -649,6 +680,7 @@ public final class EditSharedWorldScreen extends VersionedScreen {
         this.selectedMember = chooseSelected(this.memberships, this.selectedMember == null ? null : this.selectedMember.playerUuid(), WorldMembershipDto::playerUuid);
         this.populateDetailFields();
         this.refreshPreview();
+        this.repositionElements();
         this.snapshotList.setSnapshots(this.snapshots, this.selectedSnapshot == null ? null : this.selectedSnapshot.snapshotId());
         this.memberList.setMembers(this.memberships, this.selectedMember == null ? null : this.selectedMember.playerUuid());
     }
@@ -659,13 +691,27 @@ public final class EditSharedWorldScreen extends VersionedScreen {
         this.selectedIcon = null;
         this.clearCustomIcon = false;
         this.populateSettingsFields();
+        this.populatePacksFields();
     }
 
     private void populateSettingsFields() {
-        this.settingsForm.populate(this.details == null ? null : this.details.settings());
+        int initialMaxPlayers = this.details == null
+                ? (this.world != null ? this.world.maxPlayers() : 8)
+                : this.details.maxPlayers();
+        this.settingsForm.populate(this.details == null ? null : this.details.settings(), initialMaxPlayers);
         if (this.settingsForm.prefillFailed()) {
             this.setStatusError(SharedWorldText.string("screen.sharedworld.edit_settings_unreadable"));
         }
+    }
+
+    private void populatePacksFields() {
+        String initialUrl = this.details == null
+                ? (this.world != null ? this.world.resourcePackUrl() : null)
+                : this.details.resourcePackUrl();
+        boolean initialRequired = this.details == null
+                ? (this.world != null && this.world.resourcePackRequired())
+                : this.details.resourcePackRequired();
+        this.packsForm.populate(initialUrl, initialRequired);
     }
 
     private void saveSettings() {
@@ -681,28 +727,105 @@ public final class EditSharedWorldScreen extends VersionedScreen {
         this.setStatusInfoKey("screen.sharedworld.edit_status_saving_settings");
         this.updateButtons();
         link.sharedworld.api.SharedWorldModels.WorldSettingsDto dto = this.settingsForm.currentDto();
+        int newMaxPlayers = this.settingsForm.maxPlayers();
+        String currentName = this.details != null ? this.details.name() : this.world.name();
+        String currentMotd = this.details != null ? this.details.motd() : this.world.motd();
+        String updatedMotd = SharedWorldMetadataFormat.attachMetadata(
+                currentMotd,
+                newMaxPlayers,
+                this.packsForm.currentUrl(),
+                this.packsForm.currentRequired()
+        );
+
         // A lowered backups cap prunes on the backend as the save lands; the
         // Backups tab must not keep offering snapshots that no longer exist.
         boolean pruning = this.settingsForm.backupsDeletedBySave(this.snapshots.size()) > 0;
         this.dataController.saveSettings(this.world.id(), dto, updated -> {
-            this.savingSettings = false;
-            this.actionInFlight = false;
-            this.details = updated;
-            this.settingsForm.markSaved(dto);
-            this.setStatusSuccessKey("screen.sharedworld.edit_status_settings_saved");
-            // Owner-hosting shortcut: reach the live server immediately instead
-            // of waiting for the next heartbeat.
-            SharedWorldClient.hostingManager().applyLocalWorldSettingsChange(this.world.id(), dto);
-            this.updateButtons();
-            if (pruning) {
-                this.reloadData();
-            }
+            this.dataController.saveDetails(
+                    new EditSharedWorldDataController.SaveDetailsRequest(
+                            this.world.id(),
+                            currentName,
+                            updatedMotd,
+                            null,
+                            false
+                    ),
+                    updatedDetails -> {
+                        this.savingSettings = false;
+                        this.actionInFlight = false;
+                        this.details = updatedDetails;
+                        this.settingsForm.markSaved(dto, newMaxPlayers);
+                        this.setStatusSuccessKey("screen.sharedworld.edit_status_settings_saved");
+                        SharedWorldClient.hostingManager().applyLocalWorldSettingsChange(this.world.id(), dto);
+                        link.sharedworld.host.SharedWorldHostingManager.setRuntimeMaxPlayers(newMaxPlayers);
+                        this.updateButtons();
+                        this.parent.onChildOperationFinished(this.world.id());
+                        if (pruning) {
+                            this.reloadData();
+                        }
+                    },
+                    motdError -> {
+                        this.savingSettings = false;
+                        this.actionInFlight = false;
+                        this.details = updated;
+                        this.settingsForm.markSaved(dto, newMaxPlayers);
+                        this.setStatusSuccessKey("screen.sharedworld.edit_status_settings_saved");
+                        SharedWorldClient.hostingManager().applyLocalWorldSettingsChange(this.world.id(), dto);
+                        link.sharedworld.host.SharedWorldHostingManager.setRuntimeMaxPlayers(newMaxPlayers);
+                        this.updateButtons();
+                        this.parent.onChildOperationFinished(this.world.id());
+                        if (pruning) {
+                            this.reloadData();
+                        }
+                    }
+            );
         }, error -> {
             this.savingSettings = false;
             this.actionInFlight = false;
             this.setStatusError(SharedWorldMetadataFormat.friendlyMessage(error));
             this.updateButtons();
         });
+    }
+
+    private void savePacks() {
+        if (!this.isOwner() || this.savingPacks || !this.packsForm.dirty()) {
+            return;
+        }
+        this.savingPacks = true;
+        this.actionInFlight = true;
+        this.setStatusInfoKey("screen.sharedworld.edit_status_saving");
+        this.updateButtons();
+        String currentName = this.details != null ? this.details.name() : this.world.name();
+        String currentMotd = this.details != null ? this.details.motd() : this.world.motd();
+        String updatedMotd = SharedWorldMetadataFormat.attachMetadata(
+                currentMotd,
+                this.settingsForm.maxPlayers(),
+                this.packsForm.currentUrl(),
+                this.packsForm.currentRequired()
+        );
+        this.dataController.saveDetails(
+                new EditSharedWorldDataController.SaveDetailsRequest(
+                        this.world.id(),
+                        currentName,
+                        updatedMotd,
+                        null,
+                        false
+                ),
+                updatedDetails -> {
+                    this.savingPacks = false;
+                    this.actionInFlight = false;
+                    this.details = updatedDetails;
+                    this.packsForm.markSaved(this.packsForm.currentUrl(), this.packsForm.currentRequired());
+                    this.setStatusSuccessKey("screen.sharedworld.packs_saved");
+                    this.updateButtons();
+                    this.parent.onChildOperationFinished(this.world.id());
+                },
+                error -> {
+                    this.savingPacks = false;
+                    this.actionInFlight = false;
+                    this.setStatusError(SharedWorldMetadataFormat.friendlyMessage(error));
+                    this.updateButtons();
+                }
+        );
     }
 
     private void saveDetails() {
@@ -712,11 +835,18 @@ public final class EditSharedWorldScreen extends VersionedScreen {
         this.savingDetails = true;
         this.actionInFlight = true;
         this.setStatusInfoKey("screen.sharedworld.edit_status_saving");
+        String effectiveMotd = SharedWorldMetadataFormat.effectiveMotd(this.motdBox.getValue());
+        String motdWithMetadata = SharedWorldMetadataFormat.attachMetadata(
+                effectiveMotd,
+                this.settingsForm.maxPlayers(),
+                this.packsForm.currentUrl(),
+                this.packsForm.currentRequired()
+        );
         this.dataController.saveDetails(
                 new EditSharedWorldDataController.SaveDetailsRequest(
                         this.world.id(),
                         this.nameBox.getValue().trim(),
-                        SharedWorldMetadataFormat.effectiveMotd(this.motdBox.getValue()),
+                        motdWithMetadata,
                         this.selectedIcon,
                         this.clearCustomIcon
                 ),
@@ -989,30 +1119,15 @@ public final class EditSharedWorldScreen extends VersionedScreen {
     }
 
     private int iconAreaX() {
-        return WorldPreviewCard.iconX(this.contentArea);
+        return this.contentArea == null ? 0 : WorldPreviewCard.iconX(this.contentArea);
     }
 
     private int iconAreaY() {
-        return WorldPreviewCard.iconY(this.contentArea, this.previewCardY());
+        return this.nameBox == null ? 0 : this.nameBox.getY();
     }
 
     private int previewCardY() {
-        // Centered between the Replace World row and the footer so the card
-        // neither glues to the button at small heights nor drifts toward the
-        // footer at large ones. A live status banner (text-only, drawn after
-        // this card) may transiently overlap the card's lower edge at the
-        // minimum window height; there is no room to avoid that without
-        // pinning the card back against the button. The create screen keeps
-        // its bottom-anchored formula: its details step has no widget above
-        // the card, so centering there has nothing to center against.
-        int fallback = this.height - FOOTER_HEIGHT - SharedWorldStatusBanner.BAND_HEIGHT - SharedWorldServerList.ROW_HEIGHT - 2;
-        if (this.replaceWorldButton == null) {
-            return fallback;
-        }
-        int replaceBottom = this.replaceWorldButton.getY() + this.replaceWorldButton.getHeight();
-        int footerTop = this.height - FOOTER_HEIGHT;
-        int centered = replaceBottom + ((footerTop - replaceBottom) - SharedWorldServerList.ROW_HEIGHT) / 2;
-        return Math.max(replaceBottom + 6, centered);
+        return this.contentArea == null ? 0 : WorldPreviewCard.cardY(this.contentArea);
     }
 
     private String previewWorldName() {
@@ -1120,15 +1235,17 @@ public final class EditSharedWorldScreen extends VersionedScreen {
 
         @Override
         public void doLayout(ScreenRectangle area) {
-            // Compact column: the preview card is bottom-anchored, so at the 240px
-            // minimum GUI height the Replace button must still clear its top edge.
-            int left = area.left() + 38;
-            EditSharedWorldScreen.this.nameBox.setPosition(left, area.top() + 20);
-            EditSharedWorldScreen.this.nameBox.setWidth(Math.min(190, area.width() - 140));
-            EditSharedWorldScreen.this.motdBox.setPosition(left, area.top() + 68);
-            EditSharedWorldScreen.this.motdBox.setWidth(Math.min(190, area.width() - 140));
-            EditSharedWorldScreen.this.replaceWorldButton.setPosition(left, area.top() + 94);
-            EditSharedWorldScreen.this.replaceWorldButton.setWidth(Math.min(190, area.width() - 140));
+            int formLeft = WorldPreviewCard.formLeft(area);
+            int formWidth = WorldPreviewCard.formWidth(area);
+            int fieldsX = WorldPreviewCard.fieldsX(area);
+            int fieldsWidth = WorldPreviewCard.fieldsWidth(area);
+
+            EditSharedWorldScreen.this.nameBox.setPosition(fieldsX, WorldPreviewCard.nameBoxY(area));
+            EditSharedWorldScreen.this.nameBox.setWidth(fieldsWidth);
+            EditSharedWorldScreen.this.motdBox.setPosition(fieldsX, WorldPreviewCard.motdBoxY(area));
+            EditSharedWorldScreen.this.motdBox.setWidth(fieldsWidth);
+            EditSharedWorldScreen.this.replaceWorldButton.setPosition(formLeft, WorldPreviewCard.extraButtonY(area));
+            EditSharedWorldScreen.this.replaceWorldButton.setWidth(formWidth);
         }
     }
 
@@ -1151,6 +1268,28 @@ public final class EditSharedWorldScreen extends VersionedScreen {
         @Override
         public void doLayout(ScreenRectangle area) {
             EditSharedWorldScreen.this.settingsForm.layout(area);
+        }
+    }
+
+    private final class PacksTab extends link.sharedworld.versioned.VersionedTab {
+        @Override
+        public Component getTabTitle() {
+            return Component.translatable("screen.sharedworld.tab_packs");
+        }
+
+        @Override
+        protected Component sharedworldTabExtraNarration() {
+            return this.getTabTitle();
+        }
+
+        @Override
+        public void visitChildren(Consumer<AbstractWidget> consumer) {
+            EditSharedWorldScreen.this.packsForm.visitWidgets(consumer);
+        }
+
+        @Override
+        public void doLayout(ScreenRectangle area) {
+            EditSharedWorldScreen.this.packsForm.layout(area);
         }
     }
 

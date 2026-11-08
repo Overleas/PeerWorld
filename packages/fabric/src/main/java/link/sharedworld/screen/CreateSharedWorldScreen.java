@@ -56,6 +56,7 @@ public final class CreateSharedWorldScreen extends VersionedScreen implements Lo
     private LocalSaveCatalog.LocalSaveOption selectedSave;
     private StorageLinkSessionDto storageLink;
     private StorageAccountSummaryDto storageAccount;
+    private StorageAccountSummaryDto s3Account;
     private boolean accountCheckStarted;
     private FaviconTexture previewTexture;
     /** Step title sits at y 8 (9px tall); the pick list follows right under it. */
@@ -65,6 +66,7 @@ public final class CreateSharedWorldScreen extends VersionedScreen implements Lo
 
     private LocalSaveSelectionList saveList;
     private Button selectFolderButton;
+    private Button createNewWorldButton;
     private EditBox nameBox;
     private EditBox motdBox;
     private Button linkDriveButton;
@@ -139,6 +141,12 @@ public final class CreateSharedWorldScreen extends VersionedScreen implements Lo
         ).width(FOOTER_BUTTON_WIDTH).build();
         this.addRenderableWidget(this.selectFolderButton);
 
+        this.createNewWorldButton = Button.builder(
+                Component.translatable("screen.sharedworld.create_new_world"),
+                ignored -> this.openVanillaCreateWorld()
+        ).width(FOOTER_BUTTON_WIDTH).build();
+        this.addRenderableWidget(this.createNewWorldButton);
+
         this.nameBox = new EditBox(this.font, 0, 0, 220, 20, Component.translatable("screen.sharedworld.world_name"));
         this.nameBox.setMaxLength(128);
         this.nameBox.setValue(this.restoredDraft != null
@@ -190,7 +198,7 @@ public final class CreateSharedWorldScreen extends VersionedScreen implements Lo
             return;
         }
         this.accountCheckStarted = true;
-        record AccountCheck(StorageAccountSummaryDto drive, boolean s3Healthy) {
+        record AccountCheck(StorageAccountSummaryDto drive, StorageAccountSummaryDto s3) {
         }
         CompletableFuture
                 .supplyAsync(() -> {
@@ -199,7 +207,7 @@ public final class CreateSharedWorldScreen extends VersionedScreen implements Lo
                         // step becomes an explicit provider choice.
                         StorageAccountSummaryDto drive = SharedWorldClient.apiClient().getStorageAccount();
                         StorageAccountSummaryDto s3 = SharedWorldClient.apiClient().getStorageAccount("s3");
-                        return new AccountCheck(drive, s3.linked() && s3.healthy());
+                        return new AccountCheck(drive, s3);
                     } catch (Exception exception) {
                         throw new RuntimeException(exception);
                     }
@@ -212,8 +220,10 @@ public final class CreateSharedWorldScreen extends VersionedScreen implements Lo
                         return;
                     }
                     this.storageAccount = check.drive();
+                    this.s3Account = check.s3();
                     boolean driveHealthy = check.drive().linked() && check.drive().healthy();
-                    if (driveHealthy && check.s3Healthy()
+                    boolean s3Healthy = check.s3().linked() && check.s3().healthy();
+                    if (driveHealthy && s3Healthy
                             && this.wizard.step() == CreateWizardModel.Step.CONNECT_DRIVE) {
                         this.chooseProviderPending = true;
                         this.linkedStorageProvider = null;
@@ -222,8 +232,8 @@ public final class CreateSharedWorldScreen extends VersionedScreen implements Lo
                         this.updateButtons();
                         return;
                     }
-                    this.linkedStorageProvider = !driveHealthy && check.s3Healthy() ? "s3" : null;
-                    boolean advanced = this.wizard.onStorageAccountChecked(driveHealthy || check.s3Healthy());
+                    this.linkedStorageProvider = !driveHealthy && s3Healthy ? "s3" : null;
+                    boolean advanced = this.wizard.onStorageAccountChecked(driveHealthy || s3Healthy);
                     if (advanced) {
                         this.onStepChanged();
                     } else {
@@ -262,17 +272,21 @@ public final class CreateSharedWorldScreen extends VersionedScreen implements Lo
                 area.width() - CONTENT_MARGIN * 2,
                 Math.max(36, folderButtonY - 8 - PICK_LIST_TOP)
         );
-        this.selectFolderButton.setPosition(
-                area.left() + (area.width() - this.selectFolderButton.getWidth()) / 2,
-                folderButtonY
-        );
+        int buttonWidth = 145;
+        int gap = 8;
+        int centerX = area.left() + area.width() / 2;
+        this.createNewWorldButton.setWidth(buttonWidth);
+        this.createNewWorldButton.setPosition(centerX - buttonWidth - gap / 2, folderButtonY);
+        this.selectFolderButton.setWidth(buttonWidth);
+        this.selectFolderButton.setPosition(centerX + gap / 2, folderButtonY);
 
         // Details step widgets.
-        int left = area.left() + 38;
-        this.nameBox.setPosition(left, area.top() + 34);
-        this.nameBox.setWidth(Math.min(190, area.width() - 140));
-        this.motdBox.setPosition(left, area.top() + 82);
-        this.motdBox.setWidth(Math.min(190, area.width() - 140));
+        int fieldsX = WorldPreviewCard.fieldsX(area);
+        int fieldsWidth = WorldPreviewCard.fieldsWidth(area);
+        this.nameBox.setPosition(fieldsX, WorldPreviewCard.nameBoxY(area));
+        this.nameBox.setWidth(fieldsWidth);
+        this.motdBox.setPosition(fieldsX, WorldPreviewCard.motdBoxY(area));
+        this.motdBox.setWidth(fieldsWidth);
 
         // Connect step widgets.
         this.linkDriveButton.setPosition(
@@ -293,6 +307,10 @@ public final class CreateSharedWorldScreen extends VersionedScreen implements Lo
         if (this.selectFolderButton != null) {
             this.selectFolderButton.visible = step == CreateWizardModel.Step.PICK_WORLD;
             this.selectFolderButton.active = !this.submitting;
+        }
+        if (this.createNewWorldButton != null) {
+            this.createNewWorldButton.visible = step == CreateWizardModel.Step.PICK_WORLD;
+            this.createNewWorldButton.active = !this.submitting;
         }
         if (this.nameBox != null) {
             this.nameBox.visible = step == CreateWizardModel.Step.DETAILS;
@@ -400,13 +418,14 @@ public final class CreateSharedWorldScreen extends VersionedScreen implements Lo
         if (this.contentArea == null) {
             return;
         }
-        int left = this.contentArea.left() + STORAGE_LEFT_PADDING;
+        int copyWidth = Math.min(360, this.contentArea.width() - 40);
+        int left = this.contentArea.left() + (this.contentArea.width() - copyWidth) / 2;
         WrappedText.draw(guiGraphics, this.font, Component.translatable(this.chooseProviderPending
                         ? "screen.sharedworld.storage_choose_provider_detail"
                         : "screen.sharedworld.storage_google_drive_detail"),
                 left,
                 this.contentArea.top() + STORAGE_COPY_TOP,
-                this.contentArea.width() - STORAGE_LEFT_PADDING * 2,
+                copyWidth,
                 0xFFB8C5D6
         );
     }
@@ -445,6 +464,44 @@ public final class CreateSharedWorldScreen extends VersionedScreen implements Lo
         });
     }
 
+    private void openVanillaCreateWorld() {
+        link.sharedworld.versioned.ClientCompat.openCreateWorldScreen(
+                this.minecraft,
+                () -> link.sharedworld.versioned.ClientCompat.setScreen(this.minecraft, this),
+                (worldName, worldDirectory) -> {
+                    LocalSaveCatalog.LocalSaveOption newSave = new LocalSaveCatalog.LocalSaveOption(
+                            worldDirectory.getFileName().toString(),
+                            worldName,
+                            worldDirectory,
+                            System.currentTimeMillis(),
+                            null,
+                            null
+                    );
+                    CreateDraft draft = new CreateDraft(
+                            newSave,
+                            worldName,
+                            "",
+                            null,
+                            false,
+                            this.wizard.storageState() == CreateWizardModel.StorageState.LINKED_THIS_RUN ? this.storageLink : null
+                    );
+                    CreateRequest request = new CreateRequest(
+                            newSave,
+                            this.wizard.storageState() == CreateWizardModel.StorageState.LINKED_THIS_RUN ? this.storageLink : null,
+                            worldName,
+                            SharedWorldMetadataFormat.attachMaxPlayers(SharedWorldMetadataFormat.defaultMotd(), 8),
+                            null,
+                            false,
+                            this.linkedStorageProvider
+                    );
+                    link.sharedworld.versioned.ClientCompat.setScreen(
+                            this.minecraft,
+                            new CreateSharedWorldProgressScreen(this.parent, draft, request, true)
+                    );
+                }
+        );
+    }
+
     @Override
     public void onSaveSelected(LocalSaveCatalog.LocalSaveOption save) {
         String previousDefault = this.selectedSave == null ? "" : blankOr(this.selectedSave.displayName(), "");
@@ -459,41 +516,61 @@ public final class CreateSharedWorldScreen extends VersionedScreen implements Lo
     }
 
     private void renderDetailsDecorations(GuiGraphics guiGraphics) {
-        if (this.contentArea == null) {
+        if (this.contentArea == null || this.nameBox == null || this.motdBox == null) {
             return;
         }
 
-        int left = this.contentArea.left() + 38;
-        int top = this.contentArea.top();
+        ScreenRectangle area = this.contentArea;
+        int formLeft = WorldPreviewCard.formLeft(area);
+        int fieldsX = WorldPreviewCard.fieldsX(area);
         int iconX = this.iconAreaX();
         int iconY = this.iconAreaY();
+        int cardY = this.previewCardY();
 
-        guiGraphics.drawString(this.font, Component.translatable("screen.sharedworld.world_name"), left, top + 24, 0xFFA0A0A0);
-        guiGraphics.drawString(this.font, Component.translatable("screen.sharedworld.motd"), left, top + 72, 0xFFA0A0A0);
-        WorldPreviewCard.renderIconWell(guiGraphics, this.previewTexture, iconX, iconY, true, this.iconHovered, this.selectedIcon != null);
-        WorldPreviewCard.renderCard(guiGraphics, this.font, this.previewTexture, WorldPreviewCard.cardX(this.contentArea), this.previewCardY(), this.previewWorldName(), this.previewMotd());
-
+        guiGraphics.drawString(this.font, Component.translatable("screen.sharedworld.world_name"), fieldsX, this.nameBox.getY() - 12, 0xFFA0A0A0);
         if (!this.nameValid()) {
+            int nameLabelWidth = this.font.width(Component.translatable("screen.sharedworld.world_name"));
             guiGraphics.drawString(
                     this.font,
                     Component.translatable("screen.sharedworld.validation_world_name_short"),
-                    left,
-                    link.sharedworld.versioned.WidgetCompat.bottom(this.nameBox) + 6,
+                    fieldsX + nameLabelWidth + 6,
+                    this.nameBox.getY() - 12,
                     0xFFFF5555
             );
         }
+        guiGraphics.drawString(this.font, Component.translatable("screen.sharedworld.motd"), fieldsX, this.motdBox.getY() - 12, 0xFFA0A0A0);
+
+        WorldPreviewCard.renderIconWell(guiGraphics, this.previewTexture, iconX, iconY, true, this.iconHovered, this.selectedIcon != null);
+
+        guiGraphics.drawString(this.font, Component.translatable("screen.sharedworld.preview_card"), formLeft, cardY - 12, 0xFFA0A0A0);
+        WorldPreviewCard.renderCard(guiGraphics, this.font, this.previewTexture, formLeft, cardY, this.previewWorldName(), this.previewMotd());
     }
 
     private Component storageDestinationLabel() {
+        String provider = this.linkedStorageProvider;
         String email = null;
+
         if (this.wizard.storageState() == CreateWizardModel.StorageState.LINKED_THIS_RUN && this.storageLink != null) {
+            provider = this.storageLink.provider();
             email = this.storageLink.linkedAccountEmail();
+        } else if ("s3".equalsIgnoreCase(provider) || (provider == null && this.s3Account != null && this.s3Account.linked() && this.s3Account.healthy() && (this.storageAccount == null || !this.storageAccount.linked()))) {
+            provider = "s3";
+            if (this.s3Account != null && this.s3Account.linked()) {
+                email = this.s3Account.email();
+            }
         } else if (this.storageAccount != null && this.storageAccount.linked()) {
+            provider = "google-drive";
             email = this.storageAccount.email();
         }
-        return email == null || email.isBlank()
-                ? Component.translatable("screen.sharedworld.storage_saving_to_drive")
-                : SharedWorldText.component("screen.sharedworld.storage_saving_to", email);
+
+        if ("s3".equalsIgnoreCase(provider)) {
+            return Component.translatable("screen.sharedworld.storage_provider_s3");
+        }
+
+        if (email != null && !email.isBlank() && !email.contains("mock") && !email.contains("example.com")) {
+            return SharedWorldText.component("screen.sharedworld.storage_saving_to", email);
+        }
+        return Component.translatable("screen.sharedworld.storage_saving_to_drive");
     }
 
     private void updateButtons() {
@@ -816,7 +893,7 @@ public final class CreateSharedWorldScreen extends VersionedScreen implements Lo
                 save,
                 freshLink,
                 this.worldName(),
-                SharedWorldMetadataFormat.effectiveMotd(this.motdBox.getValue()),
+                SharedWorldMetadataFormat.attachMaxPlayers(SharedWorldMetadataFormat.effectiveMotd(this.motdBox.getValue()), 8),
                 this.selectedIcon,
                 this.clearCustomIcon,
                 this.linkedStorageProvider
@@ -855,13 +932,11 @@ public final class CreateSharedWorldScreen extends VersionedScreen implements Lo
     }
 
     private int iconAreaY() {
-        return this.contentArea == null ? 0 : WorldPreviewCard.iconY(this.contentArea, this.previewCardY());
+        return this.nameBox == null ? 0 : this.nameBox.getY();
     }
 
     private int previewCardY() {
-        // Bottom-anchored above the banner band so it can never collide with
-        // the footer or the banner, whatever the window height.
-        return this.height - FOOTER_HEIGHT - SharedWorldStatusBanner.BAND_HEIGHT - SharedWorldServerList.ROW_HEIGHT - 2;
+        return this.contentArea == null ? 0 : WorldPreviewCard.cardY(this.contentArea);
     }
 
     private String previewWorldName() {

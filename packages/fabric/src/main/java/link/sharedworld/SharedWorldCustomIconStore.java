@@ -9,6 +9,7 @@ import net.minecraft.client.gui.screens.FaviconTexture;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -125,7 +126,11 @@ public final class SharedWorldCustomIconStore {
                 Files.createDirectories(cached.getParent());
                 Path temp = cached.resolveSibling(cached.getFileName() + ".tmp");
                 SharedWorldClient.apiClient().downloadRawBlobToFile(signedUrl, temp);
-                Files.move(temp, cached, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                try {
+                    Files.move(temp, cached, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                } catch (AtomicMoveNotSupportedException ignored) {
+                    Files.move(temp, cached, StandardCopyOption.REPLACE_EXISTING);
+                }
                 this.failedDownloadsAtMs.remove(storageKey);
                 return cached;
             } catch (Exception exception) {

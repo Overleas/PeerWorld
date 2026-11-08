@@ -242,7 +242,7 @@ fn render_s3_link_form(
     };
     let body = format!(
         r#"<h1>Connect an S3 bucket</h1>
-    <p class="message">SharedWorld will store this world's data in your own S3-compatible bucket (Cloudflare R2, Backblaze B2, MinIO...). The bucket must be reachable from the internet. Credentials are stored encrypted and only used by the SharedWorld server.</p>
+    <p class="message">PeerWorld will store this world&#39;s data in your own S3-compatible bucket (Cloudflare R2, Backblaze B2, MinIO...). The bucket must be reachable from the internet. Credentials are stored encrypted and only used by the PeerWorld server.</p>
     {error_markup}
     <form method="post" action="/storage/s3/link">
       <input type="hidden" name="session" value="{session}">
@@ -267,7 +267,7 @@ fn render_s3_link_form(
         ),
         region =
             field("region", "Region", &fields.region, "auto", "text", "Leave empty for auto (R2/MinIO)."),
-        bucket = field("bucket", "Bucket name", &fields.bucket, "my-sharedworld-bucket", "text", ""),
+        bucket = field("bucket", "Bucket name", &fields.bucket, "my-peerworld-bucket", "text", ""),
         access_key = field("access_key_id", "Access key id", &fields.access_key_id, "", "text", ""),
         secret = field(
             "secret_access_key",
@@ -281,9 +281,9 @@ fn render_s3_link_form(
             "key_prefix",
             "Key prefix (optional)",
             &fields.key_prefix,
-            "sharedworld/",
+            "peerworld/",
             "text",
-            "Folder inside the bucket. Empty = sharedworld/, a single / = the bucket root.",
+            "Folder inside the bucket. Empty = peerworld/, a single / = the bucket root.",
         ),
     );
     render_storage_form_page(200, &body)
@@ -297,7 +297,7 @@ fn render_storage_form_page(status: u16, inner: &str) -> Response {
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>SharedWorld</title>
+    <title>PeerWorld</title>
     <style>
       :root {{ color-scheme: light; }}
       * {{ box-sizing: border-box; }}
@@ -345,7 +345,7 @@ fn render_storage_form_page(status: u16, inner: &str) -> Response {
   <body>
     <main>
       <div class="shell">
-        <p class="brand">SharedWorld</p>
+        <p class="brand">PeerWorld</p>
         <section class="card">
           {inner}
         </section>
@@ -387,7 +387,7 @@ pub fn render_storage_link_page(
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>SharedWorld</title>
+    <title>PeerWorld</title>
     <style>
       :root {{
         color-scheme: light;
@@ -477,7 +477,7 @@ pub fn render_storage_link_page(
   <body>
     <main>
       <div class="shell">
-        <p class="brand">SharedWorld</p>
+        <p class="brand">PeerWorld</p>
         <section class="card">
           <h1>{title}</h1>
           {account_markup}

@@ -1,16 +1,16 @@
 modLoader = "javafml"
 loaderVersion = "*"
-license = "All Rights Reserved"
-issueTrackerURL = "https://sharedworld.net"
+license = "MIT"
+issueTrackerURL = "https://github.com/overleas/peerworld/issues"
 
 [[mods]]
 modId = "sharedworld"
 version = "${version}"
-displayName = "SharedWorld"
-logoFile = "share_world_pixel_art.png"
-authors = "Bolido"
+displayName = "PeerWorld"
+logoFile = "peerworld_icon.png"
+authors = "Overleas, PeerWorld Contributors"
 description = '''
-Cloud-backed friend-hosted Minecraft worlds.
+Free, decentralized peer-to-peer friend-hosted Minecraft worlds with seamless handoff and offline support.
 '''
 
 [[mixins]]

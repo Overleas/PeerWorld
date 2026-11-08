@@ -87,6 +87,7 @@ public final class CreateSharedWorldProgressScreen extends link.sharedworld.vers
             null
     );
     private boolean started;
+    private final boolean autoLaunchHost;
     private volatile Thread workerThread;
     private volatile boolean cancelRequested;
     private net.minecraft.client.gui.components.Button cancelButton;
@@ -96,10 +97,20 @@ public final class CreateSharedWorldProgressScreen extends link.sharedworld.vers
             CreateSharedWorldScreen.CreateDraft draft,
             CreateSharedWorldScreen.CreateRequest request
     ) {
+        this(parent, draft, request, false);
+    }
+
+    public CreateSharedWorldProgressScreen(
+            SharedWorldScreen parent,
+            CreateSharedWorldScreen.CreateDraft draft,
+            CreateSharedWorldScreen.CreateRequest request,
+            boolean autoLaunchHost
+    ) {
         super(Component.translatable("screen.sharedworld.create_progress_title"));
         this.parent = parent;
         this.draft = draft;
         this.request = request;
+        this.autoLaunchHost = autoLaunchHost;
     }
 
     @Override
@@ -191,13 +202,29 @@ public final class CreateSharedWorldProgressScreen extends link.sharedworld.vers
                         return;
                     }
                     this.parent.onChildOperationFinished(outcome.worldId());
-                    // Land on the share-code screen: the natural next step after
-                    // creating a world is inviting someone to it. Its Back button
-                    // returns to the hub with the new world selected.
-                    link.sharedworld.versioned.ClientCompat.setScreen(
-                            this.minecraft,
-                            new SharedWorldInviteScreen(this.parent, outcome.world(), true)
-                    );
+                    if (this.autoLaunchHost) {
+                        CompletableFuture.runAsync(() -> {
+                            try {
+                                var invite = SharedWorldClient.apiClient().createInvite(outcome.worldId());
+                                if (invite != null && invite.code() != null) {
+                                    String fullCode = SharedWorldInviteScreen.formatFullInviteCode(invite.code());
+                                    Minecraft.getInstance().execute(() -> {
+                                        Minecraft.getInstance().keyboardHandler.setClipboard(fullCode);
+                                    });
+                                }
+                            } catch (Exception ignored) {
+                            }
+                        }, SharedWorldClient.ioExecutor());
+                        SharedWorldClient.sessionCoordinator().beginJoin(this.parent, outcome.world());
+                    } else {
+                        // Land on the share-code screen: the natural next step after
+                        // creating a world is inviting someone to it. Its Back button
+                        // returns to the hub with the new world selected.
+                        link.sharedworld.versioned.ClientCompat.setScreen(
+                                this.minecraft,
+                                new SharedWorldInviteScreen(this.parent, outcome.world(), true)
+                        );
+                    }
                 }));
     }
 

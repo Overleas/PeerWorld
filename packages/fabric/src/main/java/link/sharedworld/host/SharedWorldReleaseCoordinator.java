@@ -61,7 +61,12 @@ public final class SharedWorldReleaseCoordinator {
 
                     @Override
                     public void completeFinalization(String worldId, long runtimeEpoch, String hostToken) throws Exception {
-                        apiClient.completeFinalization(worldId, runtimeEpoch, hostToken);
+                        completeFinalization(worldId, runtimeEpoch, hostToken, null);
+                    }
+
+                    @Override
+                    public void completeFinalization(String worldId, long runtimeEpoch, String hostToken, String targetHostUuid) throws Exception {
+                        apiClient.completeFinalization(worldId, runtimeEpoch, hostToken, targetHostUuid);
                     }
 
                     @Override
@@ -278,6 +283,43 @@ public final class SharedWorldReleaseCoordinator {
         this.state = new ReleaseState(record, uploadingWorldProgress(), null);
         persistAndApply(record);
         return record;
+    }
+
+    public ReleaseDisplay beginTransferHandoff(Minecraft minecraft, java.util.UUID targetUuid, String targetName) {
+        SharedWorldHostingManager.ActiveHostSession session = this.hostControl.activeHostSession();
+        if (session == null || !this.clientShell.isLocalServer()) {
+            return null;
+        }
+        if (this.state != null && SharedWorldReleasePolicy.isClosedTerminal(this.state.record.phase)) {
+            acknowledgeTerminal();
+        }
+        if (this.terminalState != null && !this.terminalState.blocking) {
+            acknowledgeTerminal();
+        }
+        SharedWorldReleaseStore.ReleaseRecord record = openCoordinatedRelease(session, opened -> {
+            opened.vanillaDisconnectExpected = true;
+            opened.handoffRejoinExpected = true;
+            if (targetUuid != null) {
+                opened.targetHostUuid = targetUuid.toString();
+            }
+            opened.targetHostName = targetName;
+        });
+        this.clientShell.setScreen(this.releaseUi.savingScreen(record.worldName));
+        this.clientShell.disconnectFromWorld();
+        scheduleBeginFinalization(record.releaseAttemptId);
+        return new ReleaseDisplay(record.worldId, record.worldName);
+    }
+
+    public boolean isHandoffRejoinExpected() {
+        return this.state != null && this.state.record.handoffRejoinExpected;
+    }
+
+    public String completedWorldId() {
+        return this.state != null ? this.state.record.worldId : null;
+    }
+
+    public String completedWorldName() {
+        return this.state != null ? this.state.record.worldName : null;
     }
 
     public boolean consumeDisconnectPassThrough() {
@@ -1267,7 +1309,12 @@ public final class SharedWorldReleaseCoordinator {
             if (decision.backendFinalizationCompleted()) {
                 return;
             }
-            this.backend.completeFinalization(current.record.worldId, current.record.runtimeEpoch, current.record.hostToken);
+            this.backend.completeFinalization(
+                    current.record.worldId,
+                    current.record.runtimeEpoch,
+                    current.record.hostToken,
+                    current.record.targetHostUuid
+            );
         }, error -> {
             ReleaseState latest = this.state;
             if (shouldIgnoreAsyncCompletion(latest, attemptId)) {
@@ -1614,6 +1661,10 @@ public final class SharedWorldReleaseCoordinator {
         void beginFinalization(String worldId, long runtimeEpoch, String hostToken) throws Exception;
 
         void completeFinalization(String worldId, long runtimeEpoch, String hostToken) throws Exception;
+
+        default void completeFinalization(String worldId, long runtimeEpoch, String hostToken, String targetHostUuid) throws Exception {
+            completeFinalization(worldId, runtimeEpoch, hostToken);
+        }
 
         void releaseHost(String worldId, long runtimeEpoch, String hostToken, boolean graceful) throws Exception;
     }

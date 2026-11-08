@@ -98,4 +98,52 @@ final class SharedWorldClientConfigStoreTest {
             }
         }
     }
+
+    @Test
+    void backupIntervalDefaultsTo45AndCanBeModified() {
+        Path configFile = this.tempDir.resolve("sharedworld-client.json");
+        SharedWorldClientConfigStore store = new SharedWorldClientConfigStore(configFile);
+
+        assertEquals(45, store.backupIntervalMinutes());
+        assertEquals(5, store.autosaveIntervalMinutes());
+
+        store.setBackupIntervalMinutes(30);
+        assertEquals(30, store.backupIntervalMinutes());
+
+        SharedWorldClientConfigStore reloaded = new SharedWorldClientConfigStore(configFile);
+        assertEquals(30, reloaded.backupIntervalMinutes());
+
+        store.setBackupIntervalMinutes(0);
+        assertEquals(0, store.backupIntervalMinutes());
+
+        SharedWorldClientConfigStore reloadedManual = new SharedWorldClientConfigStore(configFile);
+        assertEquals(0, reloadedManual.backupIntervalMinutes());
+    }
+
+    @Test
+    void maxPlayersDefaultsTo8AndCanBeModifiedWithStepOfTwo() {
+        Path configFile = this.tempDir.resolve("sharedworld-client.json");
+        SharedWorldClientConfigStore store = new SharedWorldClientConfigStore(configFile);
+
+        assertEquals(8, store.maxPlayers());
+
+        store.setMaxPlayers(16);
+        assertEquals(16, store.maxPlayers());
+
+        SharedWorldClientConfigStore reloaded = new SharedWorldClientConfigStore(configFile);
+        assertEquals(16, reloaded.maxPlayers());
+
+        // Clamping to [2, 64] and step of 2
+        store.setMaxPlayers(1);
+        assertEquals(2, store.maxPlayers());
+
+        store.setMaxPlayers(100);
+        assertEquals(64, store.maxPlayers());
+
+        store.setMaxPlayers(15);
+        assertEquals(14, store.maxPlayers());
+
+        store.setMaxPlayers(32);
+        assertEquals(32, store.maxPlayers());
+    }
 }

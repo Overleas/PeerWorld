@@ -18,7 +18,7 @@ use super::runtime_access::{
     require_host_authority, require_membership, require_session_access_allowing_revoked_host,
     require_world_storage_binding,
 };
-use super::signer::{sign_download_for_world, sign_upload_for_world};
+use super::signer::{self, sign_download_for_world, sign_upload_for_world};
 use super::snapshots::{
     claim_queued_blob_deletes, is_delta_pack_transfer_mode, storage_keys_exist, WhenUnverifiable,
 };
@@ -272,11 +272,12 @@ async fn unreconstructable_pack_ids(
 enum PlanSigner {
     Backend,
     Presigned(Box<dyn crate::storage::TransferPresigner>),
+    GoogleDrive(crate::relay::RelayGrant),
 }
 
 impl PlanSigner {
     fn is_presigned(&self) -> bool {
-        matches!(self, PlanSigner::Presigned(_))
+        matches!(self, PlanSigner::Presigned(_) | PlanSigner::GoogleDrive(_))
     }
 
     fn sign_upload(
@@ -289,7 +290,7 @@ impl PlanSigner {
         request_origin: Option<&str>,
     ) -> sw_contracts::SignedBlobUrl {
         match self {
-            PlanSigner::Backend => sign_upload_for_world(
+            PlanSigner::Backend | PlanSigner::GoogleDrive(_) => sign_upload_for_world(
                 svc,
                 world_id,
                 storage_key,
@@ -314,6 +315,25 @@ impl PlanSigner {
                 sign_download_for_world(svc, world_id, storage_key, player_uuid, request_origin)
             }
             PlanSigner::Presigned(p) => p.presign_get(storage_key),
+            PlanSigner::GoogleDrive(grant) => {
+                if let Some(file_id) = grant.file_ids.get(storage_key) {
+                    let mut headers = std::collections::BTreeMap::new();
+                    headers.insert("authorization".to_string(), format!("Bearer {}", grant.access_token));
+                    let now_ms = time::to_millis(time::now());
+                    let remaining_ms = (grant.access_token_expires_at_ms - now_ms).max(60_000);
+                    sw_contracts::SignedBlobUrl {
+                        method: sw_contracts::SignedBlobMethod::GET,
+                        url: format!(
+                            "https://www.googleapis.com/drive/v3/files/{}?alt=media",
+                            signer::url_encode(file_id)
+                        ),
+                        headers,
+                        expires_at: time::plus_ms_iso(time::now(), remaining_ms),
+                    }
+                } else {
+                    sign_download_for_world(svc, world_id, storage_key, player_uuid, request_origin)
+                }
+            }
         }
     }
 }
@@ -326,6 +346,33 @@ async fn resolve_plan_signer(
     if binding.provider == StorageProviderType::S3 && ctx.client_at_least(0, 4, 0) {
         if let Some(presign) = svc.storage_provider.presign(binding) {
             return Ok(PlanSigner::Presigned(presign.presign_context(binding).await?));
+        }
+    }
+    Ok(PlanSigner::Backend)
+}
+
+async fn resolve_download_plan_signer(
+    svc: &ServiceContext,
+    ctx: &RequestContext,
+    binding: &WorldStorageBinding,
+    keys: &[String],
+) -> HttpResult<PlanSigner> {
+    if binding.provider == StorageProviderType::S3 && ctx.client_at_least(0, 4, 0) {
+        if let Some(presign) = svc.storage_provider.presign(binding) {
+            return Ok(PlanSigner::Presigned(presign.presign_context(binding).await?));
+        }
+    }
+    if binding.provider == StorageProviderType::GoogleDrive && ctx.client_at_least(0, 4, 0) {
+        if let Some(relay) = svc.storage_provider.relay(binding) {
+            match relay.relay_grant(binding, keys).await {
+                Ok(grant) => return Ok(PlanSigner::GoogleDrive(grant)),
+                Err(err) => {
+                    if err.status == 401 || err.status == 403 {
+                        return Err(err);
+                    }
+                    tracing::warn!(?err, "relay_grant failed for Google Drive download plan, falling back to backend signer");
+                }
+            }
         }
     }
     Ok(PlanSigner::Backend)
@@ -506,10 +553,6 @@ pub async fn download_plan(
     require_membership(svc, ctx, world_id).await?;
     let binding = svc.repository.get_world_storage_binding(world_id).await?;
     let provider = binding.as_ref().map(|b| b.provider).unwrap_or_else(|| svc.storage_provider.provider());
-    let signer = match binding.as_ref() {
-        Some(b) => resolve_plan_signer(svc, ctx, b).await?,
-        None => PlanSigner::Backend,
-    };
     let Some(latest) = svc.repository.get_latest_snapshot(world_id).await? else {
         return Ok(DownloadPlan {
             world_id: world_id.to_string(),
@@ -541,6 +584,18 @@ pub async fn download_plan(
             _ => None,
         })
         .collect();
+
+    let mut candidate_keys: Vec<String> = latest.packs.iter().map(|p| p.storage_key.clone()).collect();
+    for steps in chain_steps_by_pack_id.values() {
+        for s in steps {
+            candidate_keys.push(s.storage_key.clone());
+        }
+    }
+
+    let signer = match binding.as_ref() {
+        Some(b) => resolve_download_plan_signer(svc, ctx, b, &candidate_keys).await?,
+        None => PlanSigner::Backend,
+    };
 
     let mut non_region_pack_download: Option<DownloadPackPlan> = None;
     let mut region_bundle_downloads: Vec<DownloadPackPlan> = Vec::new();

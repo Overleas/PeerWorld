@@ -850,14 +850,13 @@ final class SharedWorldHostingManagerTest {
         Method driveLiveLease = SharedWorldHostingManager.class.getDeclaredMethod("driveLiveLease", long.class);
         driveLiveLease.setAccessible(true);
 
-        // Connected: 31s past the last heartbeat is base-cadence due, but the
-        // stretched safety net holds it back.
+        // Connected: 20s past the last heartbeat is not yet due (cadence is 25s).
         manager.setRealtimeConnectedSupplier(() -> true);
-        driveLiveLease.invoke(manager, 1_031_000L);
+        driveLiveLease.invoke(manager, 1_020_000L);
         assertEquals(0, background.size());
 
-        // Past the safety-net cadence the heartbeat still goes out.
-        driveLiveLease.invoke(manager, 1_000_000L + 5 * 60_000L + 1_000L);
+        // Past the 25s safety-net cadence the heartbeat goes out.
+        driveLiveLease.invoke(manager, 1_026_000L);
         assertEquals(1, background.size());
     }
 

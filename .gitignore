@@ -36,3 +36,14 @@ packages/fabric/neoforge/run-e2e-guest/
 packages/fabric/neoforge/local/mods/*.jar
 packages/fabric/local/mod-compat-probe/*.jar
 packages/fabric/local/mod-compat-probe/neoforge/*.jar
+/*.jar
+
+# Deploy runtime artifacts and binaries
+deploy/docker/data/
+deploy/docker/swcore
+deploy/docker-clean/swcore
+/*.jar
+*.pack
+*.bin
+*.part
+*.db

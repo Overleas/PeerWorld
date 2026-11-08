@@ -87,6 +87,7 @@ public final class SharedWorldClient {
     public static void init() {
         SharedWorldE4mcCompatibility.logClientInitPhase("init-start");
         link.sharedworld.versioned.ScreenBackdropCompat.install();
+        link.sharedworld.host.HostHardwareEvaluator.initializeAsync();
         RuntimePlayerIdentity.resolveBackendPlayerUuidWithHyphens(Minecraft.getInstance().getUser());
         ensureLocalCoordinatorStarted();
         apiClient = new SharedWorldApiClient(SharedWorldClientConfigStore.shared().resolvedBackendBaseUrl());
@@ -187,6 +188,7 @@ public final class SharedWorldClient {
         guestCacheWarmer.tick(client);
         sessionCoordinator.tick(client);
         hostRosterReporter.tick(client);
+        SharedWorldNotificationManager.tick(client);
         SharedWorldClientLifecycleRouter.ensureLifecycleScreenVisible(client, releaseCoordinator);
     }
 
@@ -223,6 +225,35 @@ public final class SharedWorldClient {
         }
     }
 
+    /** Loader event: a player connected to the running integrated server. */
+    public static void onServerPlayerJoin(net.minecraft.server.level.ServerPlayer player, net.minecraft.server.MinecraftServer server) {
+        if (player == null || server == null) {
+            return;
+        }
+        com.mojang.authlib.GameProfile hostProfile = server.getSingleplayerProfile();
+        if (hostProfile != null && player.getUUID().equals(link.sharedworld.versioned.ClientCompat.profileId(hostProfile))) {
+            return;
+        }
+        if (!SharedWorldDevSessionBridge.isHostingSharedWorld()) {
+            return;
+        }
+        SharedWorldHostingManager hm = hostingManager;
+        if (hm == null) {
+            return;
+        }
+        WorldSummaryDto hostingWorld = hm.hostingWorld();
+        if (hostingWorld == null) {
+            return;
+        }
+        String packUrl = hostingWorld.resourcePackUrl();
+        if (packUrl != null && !packUrl.isBlank()) {
+            java.util.UUID packId = java.util.UUID.nameUUIDFromBytes((hostingWorld.id() + ":" + packUrl.trim()).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            boolean required = hostingWorld.resourcePackRequired();
+            net.minecraft.network.chat.Component prompt = net.minecraft.network.chat.Component.translatable("screen.sharedworld.resource_pack_prompt");
+            link.sharedworld.versioned.ClientCompat.sendResourcePack(player, packId, packUrl.trim(), "", required, prompt);
+        }
+    }
+
     private static void onPlayDisconnect(
             Minecraft client,
             ClientPacketListener handler,
@@ -250,11 +281,15 @@ public final class SharedWorldClient {
         presenceManager.onDisconnect(session);
         guestRuntimeWatcher.onDisconnect(session);
         guestCacheWarmer.onDisconnect(session);
+        SharedWorldNotificationManager.reset();
+        link.sharedworld.host.SharedWorldHostIndicator.clear();
         SharedWorldReleaseCoordinator.ReleaseDisplay releaseDisplay = releaseCoordinator.onClientDisconnectReturnDisplay(client);
         SharedWorldPlaySessionTracker.RecoverySession recoverySession = connectionKeyMatched
                 ? PLAY_SESSION_TRACKER.onDisconnect(handler)
                 : session != null ? PLAY_SESSION_TRACKER.onDisconnect() : PLAY_SESSION_TRACKER.onDisconnect(handler);
         SharedWorldDevSessionBridge.clearHostingSession();
+        SharedWorldNotificationManager.reset();
+        link.sharedworld.host.SharedWorldHostIndicator.clear();
         sessionCoordinator.onUnexpectedGuestDisconnect(recoverySession);
         if (releaseDisplay != null) {
             SharedWorldClientLifecycleRouter.ensureLifecycleScreenVisible(client, releaseCoordinator);
@@ -279,6 +314,8 @@ public final class SharedWorldClient {
         presenceManager.onDisconnect(session);
         guestRuntimeWatcher.onDisconnect(session);
         guestCacheWarmer.onDisconnect(session);
+        SharedWorldNotificationManager.reset();
+        link.sharedworld.host.SharedWorldHostIndicator.clear();
         // markUserInitiatedDisconnect already ran in the disconnect hook, so
         // this teardown produces no recovery session.
         PLAY_SESSION_TRACKER.onDisconnect();
@@ -322,6 +359,8 @@ public final class SharedWorldClient {
         presenceManager.onDisconnect(session);
         guestRuntimeWatcher.onDisconnect(session);
         guestCacheWarmer.onDisconnect(session);
+        SharedWorldNotificationManager.reset();
+        link.sharedworld.host.SharedWorldHostIndicator.clear();
         SharedWorldPlaySessionTracker.RecoverySession recoverySession = PLAY_SESSION_TRACKER.onDisconnect();
         sessionCoordinator.onUnexpectedGuestDisconnect(recoverySession);
     }
@@ -486,8 +525,10 @@ public final class SharedWorldClient {
 
     public static void openMainScreen(Screen parent) {
         SharedWorldClientConfigStore.shared().rememberSharedWorld();
-        link.sharedworld.versioned.GuiCompat.clearFocus(parent);
-        link.sharedworld.versioned.ClientCompat.setScreen(Minecraft.getInstance(), new SharedWorldScreen(parent));
+        if (parent != null) {
+            link.sharedworld.versioned.GuiCompat.clearFocus(parent);
+        }
+        link.sharedworld.versioned.ClientCompat.setScreen(Minecraft.getInstance(), new SharedWorldScreen(parent == null ? defaultSharedWorldParent() : parent));
     }
 
     public static void openMembershipRevokedScreen(Screen parent) {

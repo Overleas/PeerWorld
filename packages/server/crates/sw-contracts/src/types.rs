@@ -674,6 +674,10 @@ pub struct EnterSessionRequest {
     pub waiter_session_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub acknowledge_unclean_shutdown: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hardware_score: Option<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub allow_auto_host: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -819,6 +823,8 @@ pub struct ReleaseHostRequest {
     pub runtime_epoch: Option<i64>,
     #[serde(default)]
     pub host_token: Option<String>,
+    #[serde(default)]
+    pub target_host_uuid: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
@@ -828,6 +834,8 @@ pub struct HostAuthorityRequest {
     pub runtime_epoch: Option<i64>,
     #[serde(default)]
     pub host_token: Option<String>,
+    #[serde(default)]
+    pub target_host_uuid: Option<String>,
 }
 pub type BeginFinalizationRequest = HostAuthorityRequest;
 pub type CompleteFinalizationRequest = HostAuthorityRequest;

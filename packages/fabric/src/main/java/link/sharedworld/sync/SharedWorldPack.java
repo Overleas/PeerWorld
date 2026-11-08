@@ -159,6 +159,29 @@ public final class SharedWorldPack {
     }
 
     /**
+     * Resolves a relative path safely against a base directory, preventing
+     * directory traversal / ZipSlip vulnerabilities (e.g. "../" or root paths).
+     */
+    public static Path resolveSafe(Path baseDir, String relativePath) throws IOException {
+        String sanitized = relativePath.replace('\\', '/').trim();
+        while (sanitized.startsWith("/")) {
+            sanitized = sanitized.substring(1);
+        }
+        if (sanitized.length() >= 2 && Character.isLetter(sanitized.charAt(0)) && sanitized.charAt(1) == ':') {
+            sanitized = sanitized.substring(2);
+            while (sanitized.startsWith("/")) {
+                sanitized = sanitized.substring(1);
+            }
+        }
+        Path base = baseDir.toAbsolutePath().normalize();
+        Path target = base.resolve(sanitized.replace('/', java.io.File.separatorChar)).normalize();
+        if (!target.startsWith(base)) {
+            throw new IOException("Path traversal attempt in pack entry: " + relativePath);
+        }
+        return target;
+    }
+
+    /**
      * Extracts every entry and returns each entry's content hash, computed
      * while the bytes are written so callers verify extractions without a
      * second full read of everything extracted.
@@ -167,7 +190,7 @@ public final class SharedWorldPack {
         List<PackEntryMetadata> entries = readMetadata(packFile);
         Map<String, String> extractedHashes = new HashMap<>(entries.size());
         for (PackEntryMetadata entry : entries) {
-            Path target = outputDirectory.resolve(entry.relativePath().replace('/', java.io.File.separatorChar));
+            Path target = resolveSafe(outputDirectory, entry.relativePath());
             if (target.getParent() != null) {
                 Files.createDirectories(target.getParent());
             }

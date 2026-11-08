@@ -1585,3 +1585,25 @@ async fn a_dead_storage_grant_keeps_its_own_code_on_the_download_plan() {
     let err = f.download(&owner(), &UploadPlanRequest::default()).await.unwrap_err();
     assert_eq!((err.status, err.code), (401, "drive_reauth_required"), "{err}");
 }
+
+#[tokio::test]
+async fn google_drive_download_plan_provides_direct_media_url_and_bearer() {
+    let f = Fixture::drive().await;
+    let key = "packs/full/pa/pack-a.pack";
+    f.seed_blob(key, "pack-a-bytes").await;
+    f.finalize(
+        None,
+        vec![pack(NON_REGION_PACK_ID, "pack-a", 100, key, FileTransferMode::PackFull, &[("level.dat", "a")])],
+        1_000,
+    )
+    .await;
+
+    let ctx = v2(OWNER_UUID, "Owner");
+    let plan = f.download(&ctx, &UploadPlanRequest::default()).await.unwrap();
+    let non_region = plan.non_region_pack_download.unwrap().unwrap();
+    let step = &non_region.steps[0];
+    assert!(step.download.url.contains("googleapis.com/drive/v3/files/"), "url was {}", step.download.url);
+    assert!(step.download.url.contains("alt=media"), "url was {}", step.download.url);
+    assert!(step.download.headers.contains_key("authorization"), "missing authorization header");
+    assert!(step.download.headers.get("authorization").unwrap().starts_with("Bearer "));
+}

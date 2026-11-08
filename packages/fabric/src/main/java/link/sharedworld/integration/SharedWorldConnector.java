@@ -32,6 +32,12 @@ public final class SharedWorldConnector {
             ConnectStarter connectStarter,
             ConnectFailureHandler connectFailureHandler
     ) {
+        if (target == null || target.isBlank() || target.trim().startsWith(":") || ":25565".equals(target.trim())) {
+            LOGGER.error("Cannot connect to empty/invalid target '{}'", target);
+            connectFailureHandler.onFailure(parent, new IllegalArgumentException("Invalid join target: " + target));
+            return;
+        }
+
         if (worldId != null) {
             SharedWorldClient.playSessionTracker().beginGuestConnect(worldId, worldName, target, runtimeEpoch);
         }

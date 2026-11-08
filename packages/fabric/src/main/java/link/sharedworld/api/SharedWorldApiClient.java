@@ -324,6 +324,8 @@ public final class SharedWorldApiClient {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("waiterSessionId", waiterSessionId);
         body.put("acknowledgeUncleanShutdown", acknowledgeUncleanShutdown);
+        body.put("hardwareScore", link.sharedworld.host.HostHardwareEvaluator.get().score());
+        body.put("allowAutoHost", link.sharedworld.SharedWorldClientConfigStore.shared().allowAutoHost());
         return request("POST", "/worlds/" + worldId + "/session/enter", body, EnterSessionResponseDto.class, true);
     }
 
@@ -398,9 +400,16 @@ public final class SharedWorldApiClient {
     }
 
     public FinalizationActionResultDto completeFinalization(String worldId, long runtimeEpoch, String hostToken) throws IOException, InterruptedException {
+        return completeFinalization(worldId, runtimeEpoch, hostToken, null);
+    }
+
+    public FinalizationActionResultDto completeFinalization(String worldId, long runtimeEpoch, String hostToken, String targetHostUuid) throws IOException, InterruptedException {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("runtimeEpoch", runtimeEpoch);
         body.put("hostToken", hostToken);
+        if (targetHostUuid != null && !targetHostUuid.isBlank()) {
+            body.put("targetHostUuid", targetHostUuid);
+        }
         return request("POST", "/worlds/" + worldId + "/complete-finalization", body, FinalizationActionResultDto.class, true);
     }
 
@@ -860,10 +869,17 @@ public final class SharedWorldApiClient {
     }
 
     public void releaseHost(String worldId, boolean graceful, long runtimeEpoch, String hostToken) throws IOException, InterruptedException {
+        releaseHost(worldId, graceful, runtimeEpoch, hostToken, null);
+    }
+
+    public void releaseHost(String worldId, boolean graceful, long runtimeEpoch, String hostToken, String targetHostUuid) throws IOException, InterruptedException {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("graceful", graceful);
         body.put("runtimeEpoch", runtimeEpoch);
         body.put("hostToken", hostToken);
+        if (targetHostUuid != null && !targetHostUuid.isBlank()) {
+            body.put("targetHostUuid", targetHostUuid);
+        }
         request("POST", "/worlds/" + worldId + "/release-host", body, null, true);
     }
 

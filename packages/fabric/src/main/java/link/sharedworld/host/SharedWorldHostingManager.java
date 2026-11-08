@@ -1,7 +1,12 @@
 package link.sharedworld.host;
 
+import link.sharedworld.SharedWorldClient;
 import link.sharedworld.SharedWorldDevSessionBridge;
 import link.sharedworld.SharedWorldText;
+import link.sharedworld.versioned.ClientCompat;
+import net.minecraft.ChatFormatting;
+import net.minecraft.server.MinecraftServer;
+import java.util.UUID;
 import link.sharedworld.api.SharedWorldApiClient;
 import link.sharedworld.api.SharedWorldModels;
 import link.sharedworld.api.SharedWorldModels.HostAssignmentDto;
@@ -38,7 +43,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public final class SharedWorldHostingManager {
     private static final Logger LOGGER = LoggerFactory.getLogger("sharedworld-hosting");
-    private static final long HEARTBEAT_INTERVAL_MS = 30_000L;
+    private static final long HEARTBEAT_INTERVAL_MS = 25_000L;
     private static final long HEARTBEAT_RETRY_INTERVAL_MS = 1_000L;
     private static final int HEARTBEAT_FAILURES_BEFORE_WARNING = 3;
     private static final long HOST_CONFIRM_TIMEOUT_MS = 90_000L;
@@ -68,10 +73,29 @@ public final class SharedWorldHostingManager {
     // this at 60s is retired: the channel now enforces an ack-deadline, so
     // "connected" implies inbound traffic within the last 45s and a half-open
     // socket demotes itself to the 30s disconnected cadence within a minute.
-    private static final long PUSH_CONNECTED_HEARTBEAT_INTERVAL_MS = 300_000L;
+    // Keep HTTP heartbeats strictly below server HOST_LIVE_LEASE_TIMEOUT_MS (150_000ms)
+    // regardless of WebSocket push channel state to permanently prevent 150s AFK/solo kicks.
+    private static final long PUSH_CONNECTED_HEARTBEAT_INTERVAL_MS = 25_000L;
     // Local gamerule reads are free; only diffs go over HTTP. Decoupled from
     // the heartbeat so stretched heartbeats never delay gamerule persistence.
     private static final long GAMERULES_LOCAL_POLL_INTERVAL_MS = 5_000L;
+
+    private static volatile int runtimeMaxPlayers = 0;
+
+    public static int effectiveMaxPlayers() {
+        if (runtimeMaxPlayers >= 2) {
+            return runtimeMaxPlayers;
+        }
+        try {
+            return link.sharedworld.SharedWorldClientConfigStore.shared().maxPlayers();
+        } catch (Throwable ignored) {
+            return 8;
+        }
+    }
+
+    public static void setRuntimeMaxPlayers(int count) {
+        runtimeMaxPlayers = Math.max(2, Math.min(64, (count / 2) * 2));
+    }
 
     private final SharedWorldApiClient apiClient;
     private final HostStartupProgressRelayController startupProgressRelay;
@@ -108,14 +132,15 @@ public final class SharedWorldHostingManager {
     private volatile long lastHeartbeatAttemptAt;
     private volatile int consecutiveHeartbeatFailures;
     private volatile long lastAutosaveAt;
+    private volatile long lastBackupAt;
     /** Earliest time the next autosave may start after a failure; 0 while saves succeed. */
     private volatile long autosaveNotBefore;
     /** C2 sticky autosave error: non-null while saves are failing; cleared by the next SUCCESSFUL save. */
     private volatile String autosaveErrorMessage;
-    private int consecutiveAutosaveFailures;
+    private volatile int consecutiveAutosaveFailures;
     /** 0 while nothing has been announced this episode; also gates the recovery announcement. */
-    private long lastAutosaveFailureAnnouncedAt;
-    private AutosaveFailureKind announcedAutosaveFailureKind;
+    private volatile long lastAutosaveFailureAnnouncedAt;
+    private volatile AutosaveFailureKind announcedAutosaveFailureKind;
     private volatile long heartbeatIntervalMs = HEARTBEAT_INTERVAL_MS;
     private volatile long autosaveIntervalMs = AUTOSAVE_INTERVAL_MS;
     private volatile long startupAttemptId;
@@ -571,15 +596,30 @@ public final class SharedWorldHostingManager {
         }
     }
 
+    private long configuredBackupIntervalMs() {
+        try {
+            return link.sharedworld.SharedWorldClientConfigStore.shared().backupIntervalMinutes() * 60_000L;
+        } catch (Throwable ignored) {
+            return 45 * 60_000L;
+        }
+    }
+
     private void driveRunningLoop(long now) {
         if (this.phase != Phase.RUNNING || this.coordinatedRelease != CoordinatedRelease.NONE) {
             return;
+        }
+        long backupInterval = configuredBackupIntervalMs();
+        if (backupInterval > 0 && now >= this.autosaveNotBefore && now - this.lastBackupAt >= backupInterval) {
+            if (this.saveInFlight.compareAndSet(0L, this.hostSessionGeneration)) {
+                uploadSnapshot(true, null, null);
+                return;
+            }
         }
         long currentInterval = configuredAutosaveIntervalMs();
         if (now >= this.autosaveNotBefore
                 && now - this.lastAutosaveAt >= currentInterval
                 && this.saveInFlight.compareAndSet(0L, this.hostSessionGeneration)) {
-            uploadSnapshot();
+            uploadSnapshot(false, null, null);
         }
         // Gamerule detection runs on its own local cadence (0.3.0): reading
         // the integrated server is free, and only diffs are reported, so a
@@ -693,6 +733,14 @@ public final class SharedWorldHostingManager {
         // rewrites gamerules, so the next snapshot must re-baseline.
         this.gameRulesSync.invalidateBaseline();
         this.events.onWorldSettingsChanged(settings);
+    }
+
+    public boolean isHosting(String worldId) {
+        return this.startupStarted.get() && this.world != null && this.world.id().equals(worldId) && this.phase != Phase.IDLE && this.phase != Phase.ERROR;
+    }
+
+    public WorldSummaryDto hostingWorld() {
+        return this.world;
     }
 
     public void beginCoordinatedRelease() {
@@ -1080,6 +1128,7 @@ public final class SharedWorldHostingManager {
                 && confirmedJoinTarget != null
                 && confirmedJoinTarget.equals(this.publishedJoinTarget)) {
             this.lastAutosaveAt = this.lastHeartbeatAt;
+            this.lastBackupAt = this.lastHeartbeatAt;
             this.autosaveNotBefore = 0L;
             saveHostRecoveryMarker();
             this.gameRulesSync.rebaselineForNewLiveSession();
@@ -1184,23 +1233,59 @@ public final class SharedWorldHostingManager {
         return this.publishedJoinTarget;
     }
 
+    public void transferHostTo(UUID targetUuid, String targetName) {
+        Minecraft minecraft = Minecraft.getInstance();
+        MinecraftServer server = minecraft.getSingleplayerServer();
+        if (server == null || !SharedWorldDevSessionBridge.isHostingSharedWorld()) {
+            return;
+        }
+
+        // 1. Announce to all players in chat
+        server.getPlayerList().broadcastSystemMessage(
+                Component.translatable("peerworld.command.transfer.starting", targetName)
+                        .withStyle(ChatFormatting.GOLD),
+                false
+        );
+
+        // 2. Show local toast
+        ClientCompat.showToast(
+                minecraft,
+                Component.translatable("toast.peerworld.transfer_title"),
+                Component.translatable("toast.peerworld.transfer_starting", targetName)
+        );
+
+        // 3. Flush & save everything
+        try {
+            server.saveEverything(true, true, true);
+        } catch (Exception e) {
+            LOGGER.warn("SharedWorld failed to save server during host transfer", e);
+        }
+
+        // 4. Begin transfer release & handoff
+        SharedWorldClient.releaseCoordinator().beginTransferHandoff(minecraft, targetUuid, targetName);
+    }
+
     public boolean triggerManualBackup(Runnable onComplete, java.util.function.Consumer<Exception> onError) {
         HostAttemptContext context = currentAttemptContext();
         if (context == null || this.phase != Phase.RUNNING || this.coordinatedRelease != CoordinatedRelease.NONE) {
             return false;
         }
         if (this.saveInFlight.compareAndSet(0L, this.hostSessionGeneration)) {
-            uploadSnapshot(onComplete, onError);
+            uploadSnapshot(true, onComplete, onError);
             return true;
         }
         return false;
     }
 
     private void uploadSnapshot() {
-        uploadSnapshot(null, null);
+        uploadSnapshot(false, null, null);
     }
 
     private void uploadSnapshot(Runnable onComplete, java.util.function.Consumer<Exception> onError) {
+        uploadSnapshot(false, onComplete, onError);
+    }
+
+    private void uploadSnapshot(boolean isExplicitBackup, Runnable onComplete, java.util.function.Consumer<Exception> onError) {
         HostAttemptContext context = currentAttemptContext();
         if (context == null) {
             this.saveInFlight.set(0L);
@@ -1225,13 +1310,23 @@ public final class SharedWorldHostingManager {
                     if (!isCurrentAttempt(context)) {
                         return;
                     }
-                    this.lastAutosaveAt = System.currentTimeMillis();
+                    long now = System.currentTimeMillis();
+                    this.lastAutosaveAt = now;
+                    if (isExplicitBackup) {
+                        this.lastBackupAt = now;
+                    }
                     clearAutosaveError();
                     // A release that began while this save was in flight owns the
                     // phase now; stomping RELEASING back to RUNNING would tear
                     // down the finalization progress guests are watching.
                     if (this.coordinatedRelease == CoordinatedRelease.NONE) {
                         setPhase(Phase.RUNNING);
+                    }
+                    if (isExplicitBackup) {
+                        link.sharedworld.SharedWorldNotificationManager.notifyBackupSaved();
+                        announceInChat(link.sharedworld.SharedWorldText.string("peerworld.backup.created_chat"));
+                    } else {
+                        link.sharedworld.SharedWorldNotificationManager.notifyAutoSaveSaved();
                     }
                     if (onComplete != null) {
                         onComplete.run();
@@ -1612,6 +1707,7 @@ public final class SharedWorldHostingManager {
         this.lastGameRulesLocalPollAt = 0L;
         this.consecutiveHeartbeatFailures = 0;
         this.lastAutosaveAt = 0L;
+        this.lastBackupAt = 0L;
         this.autosaveNotBefore = 0L;
         // Without this, a failure episode announced in a previous session
         // would fake a "backups are working again" chat line in this one.
@@ -1621,6 +1717,7 @@ public final class SharedWorldHostingManager {
         this.gameRulesSync.reset();
         this.startupProgressRelayActive = false;
         this.startupProgressRelay.reset();
+        runtimeMaxPlayers = this.world != null ? this.world.maxPlayers() : 8;
         this.saveInFlight.set(0L);
         this.heartbeatInFlight.set(0L);
         this.startupCancelRequested = false;

@@ -43,8 +43,20 @@ public final class SharedWorldSavingScreen extends link.sharedworld.versioned.Ve
             return;
         }
         if (view.phase() == SharedWorldReleasePhase.COMPLETE) {
+            boolean handoff = coordinator.isHandoffRejoinExpected();
+            String worldId = coordinator.completedWorldId();
+            String worldName = coordinator.completedWorldName();
             coordinator.acknowledgeTerminal();
-            SharedWorldClient.openMainScreen(this.parent);
+            if (handoff && worldId != null) {
+                // Former host seamlessly rejoins world as a guest
+                SharedWorldClient.sessionCoordinator().beginHandoffRejoin(
+                        this.parent,
+                        worldId,
+                        worldName != null ? worldName : ""
+                );
+            } else {
+                SharedWorldClient.openMainScreen(this.parent);
+            }
             return;
         }
         if (view.phase() == SharedWorldReleasePhase.TERMINATED_DELETED) {

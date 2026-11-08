@@ -163,6 +163,24 @@ final class SharedWorldPackTest {
         assertEquals(LocalWorldHasher.hashFile(extractRoot.resolve("data").resolve("foo.txt")), extractedHashes.get("data/foo.txt"));
     }
 
+    @Test
+    void resolveSafePreventsDirectoryTraversal() throws Exception {
+        Path base = this.tempDir.resolve("world");
+        Files.createDirectories(base);
+
+        // Safe paths
+        Path safeNormal = SharedWorldPack.resolveSafe(base, "data/foo.txt");
+        assertEquals(base.resolve("data").resolve("foo.txt"), safeNormal);
+
+        Path safeLeadingSlash = SharedWorldPack.resolveSafe(base, "/region/r.0.0.mca");
+        assertEquals(base.resolve("region").resolve("r.0.0.mca"), safeLeadingSlash);
+
+        // Path traversal attempts
+        assertThrows(IOException.class, () -> SharedWorldPack.resolveSafe(base, "../escaped.txt"));
+        assertThrows(IOException.class, () -> SharedWorldPack.resolveSafe(base, "nested/../../escaped.txt"));
+        assertThrows(IOException.class, () -> SharedWorldPack.resolveSafe(base, "/../../escaped.txt"));
+    }
+
     private PreparedWorldFile preparedFile(String relativePath, byte[] bytes) throws Exception {
         Path file = this.tempDir.resolve("source").resolve(relativePath.replace('/', java.io.File.separatorChar));
         if (file.getParent() != null) {

@@ -134,14 +134,14 @@ final class DownloadPlanApplier {
             extractedPackRoot = Files.createTempDirectory(this.worldStore.worldContainer(this.worldId), "pack-extract-");
             Map<String, String> extractedPackHashes = SharedWorldPack.extract(downloadedPack, extractedPackRoot);
             for (var file : this.plan.nonRegionPackDownload().files()) {
-                Path tempFile = extractedPackRoot.resolve(file.path().replace('/', java.io.File.separatorChar));
+                Path tempFile = SharedWorldPack.resolveSafe(extractedPackRoot, file.path());
                 if (!Files.exists(tempFile)) {
                     throw new IOException("SharedWorld pack was missing extracted file " + file.path() + ".");
                 }
                 if (!file.hash().equals(extractedPackHashes.get(file.path()))) {
                     throw new IOException("SharedWorld extracted pack file hash mismatch for " + file.path() + ".");
                 }
-                downloadedFiles.add(new DownloadedFile(file.path(), this.worldDirectory.resolve(file.path().replace('/', java.io.File.separatorChar)), tempFile));
+                downloadedFiles.add(new DownloadedFile(file.path(), SharedWorldPack.resolveSafe(this.worldDirectory, file.path()), tempFile));
             }
         }
 
@@ -181,7 +181,7 @@ final class DownloadPlanApplier {
                     DownloadPlanEntryDto download = this.plan.downloads()[downloadIndex];
                     int fileIndex = downloadIndex + this.entryIndexOffset;
                     futures.add(executor.submit(() -> {
-                        Path target = this.worldDirectory.resolve(download.path().replace('/', java.io.File.separatorChar));
+                        Path target = SharedWorldPack.resolveSafe(this.worldDirectory, download.path());
                         if (target.getParent() != null) {
                             Files.createDirectories(target.getParent());
                         }
@@ -435,14 +435,14 @@ final class DownloadPlanApplier {
                 Map<String, String> extractedBundleHashes = SharedWorldPack.extract(downloadedBundle, extractRoot);
                 List<DownloadedFile> files = new ArrayList<>(bundle.files().length);
                 for (var file : bundle.files()) {
-                    Path tempFile = extractRoot.resolve(file.path().replace('/', java.io.File.separatorChar));
+                    Path tempFile = SharedWorldPack.resolveSafe(extractRoot, file.path());
                     if (!Files.exists(tempFile)) {
                         throw new IOException("SharedWorld region bundle was missing extracted file " + file.path() + ".");
                     }
                     if (!file.hash().equals(extractedBundleHashes.get(file.path()))) {
                         throw new IOException("SharedWorld extracted region bundle file hash mismatch for " + file.path() + ".");
                     }
-                    files.add(new DownloadedFile(file.path(), this.worldDirectory.resolve(file.path().replace('/', java.io.File.separatorChar)), tempFile));
+                    files.add(new DownloadedFile(file.path(), SharedWorldPack.resolveSafe(this.worldDirectory, file.path()), tempFile));
                 }
                 return new DownloadedBundle(bundle, downloadedBundle, extractRoot, files);
             } catch (IOException | RuntimeException failure) {

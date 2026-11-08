@@ -1,45 +1,41 @@
-# 📜 Журнал змін (Changelog) — PeerWorld
+# 📜 PeerWorld Changelog
 
-Усі попередні версії автоматично зберігаються в папці резервних копій:
-📁 `/home/overleas/Стільниця/PeerWorld-Backups/`
+All notable changes to the **PeerWorld** Minecraft mod are documented in this file.
 
 ---
 
-## [1.0.0] — 2026-11-05 (Реліз "Google Cloud & Multilingual")
+## [1.0.0] — 2026-11-08 (Official Initial Release)
 
-### ☁️ Хмарні сховища та Синхронізація
-* **Повна інтеграція Google Диска ($0/міс):**
-  - Офіційний потік Google OAuth 2.0 без моків та демо-заглушок.
-  - Збереження в ізольовану безпечну системну папку `appDataFolder` (не засмічує робочий Google Диск користувача).
-  - Надійний дельта-синхронізатор (CAS блоби): вивантажуються лише змінені блоки та чанки.
-* **Підтримка Cloudflare R2 / S3:** альтернативне високошвидкісне об'єктне сховище без плати за трафік.
-* **Координатор 24/7 на Render:**
-  - Виправлено запуск бойового сервера без прапорця `--dev`.
-  - Усунуто помилковий перезапис URL Google Accounts у клієнтському моді.
+### 🌟 New Features & Highlights
+* **Decentralized Peer-to-Peer Multiplayer:** Play in shared worlds with friends with zero dedicated server costs ($0.00).
+* **Seamless Host Takeover (Handoff):** When the current host disconnects, any permitted friend can seamlessly take over hosting the world.
+* **Smart Delta Synchronization Engine:**
+  * Chunk-level and region-level delta computation.
+  * Only modified blocks and entities are uploaded/downloaded, minimizing network usage.
+* **World-Bound Datapacks & Automatic Client Resource Pack Push:**
+  * **Datapacks:** Synchronize automatically per-world across all players.
+  * **Resource Packs:** Automatically pushed via native Minecraft packet to guests upon joining, with direct SHA-1 verification.
+* **Customizable Player Capacity (2–64):**
+  * Per-world player limit slider integrated directly into World Settings.
+  * Synchronized transparently across all participants.
+* **Zero-Config P2P Tunnels:** Direct connectivity via `e4mc` and `QuicLime` without requiring port forwarding or VPNs.
+* **Free Isolated Cloud Storage:**
+  * Google Drive (isolated strictly to `appDataFolder`).
+  * Cloudflare R2 / AWS S3 / MinIO compatible.
+  * Local Offline mode for pure LAN play.
+* **Full Multi-Loader Support:**
+  * Fabric Loader (Minecraft 1.20.1, 1.21.1, 1.21.11, 26.1, 26.3).
+  * NeoForge Loader (Minecraft 1.21.1, 1.21.11).
+* **100% Localization Parity across 11 Languages:**
+  * English (`en_us`), Ukrainian (`uk_ua`), Polish (`pl_pl`), German (`de_de`), Spanish (`es_es`), French (`fr_fr`), Portuguese (`pt_br`), Russian (`ru_ru`), Chinese Simplified (`zh_cn`), Japanese (`ja_jp`), and Catalan (`ca_es`).
 
-### 💾 Система бекапів і відновлення
-* **Ігрові команди:**
-  - `/pw backup [назва]` та `/peerworld backup [назва]` — миттєве створення хмарного знімка стану з повідомленнями в чаті.
-  - `/pw help` — інтерактивне меню доступних команд.
-  - `/pw info` — інформація про активний світ, адресу e4mc-тунелю, кількість гравців та статус Google Диска.
-* **Налаштування:**
-  - Вибір інтервалу авто-бекапу: кожні 5 хв, 15 хв, 30 хв, 1 год, 2 год.
-  - Вкладка «Бекапи» з можливістю відкотити світ на будь-яку збережену точку в 1 клік.
+### 🛡 Security & Reliability
+* **Directory Traversal / ZipSlip Protection:** Rigid validation (`SharedWorldPack.resolveSafe` and `DownloadPlanApplier`) guarantees no malicious files can escape the designated world directory.
+* **MOTD CRLF Sanitization:** Prevents header injection or display corruption from carriage return characters.
+* **Atomic Save Writes:** Safe fallback mechanisms handle cross-device file moves and prevent world corruption during unexpected power cuts.
+* **Platform TOS Compliance:** Removed all explicit mentions of unauthorized/pirated launchers to adhere strictly to Modrinth and CurseForge moderation standards.
 
-### 🌐 Локалізація на 10 мов світу
-* Додано повні переклади на **10 мов** із 100% паритетом усіх 797 ключів:
-  - 🇺🇦 Українська (`uk_ua`)
-  - 🇷🇺 Російська (`ru_ru`)
-  - 🇬🇧 Англійська (`en_us`)
-  - 🇪🇸 Іспанська (`es_es`)
-  - 🇩🇪 Німецька (`de_de`)
-  - 🇫🇷 Французька (`fr_fr`)
-  - 🇧🇷 Португальська (Бразилія) (`pt_br`)
-  - 🇨🇳 Китайська спрощена (`zh_cn`)
-  - 🇯🇵 Японська (`ja_jp`)
-  - 🇪🇸 Каталанська (`ca_es`)
+---
 
-### 🛡️ Надійність і безпека
-* Вичищено всі жорстко прописані шляхи ОС (`/home/overleas/...`), тепер мод 100% портативний для будь-яких комп'ютерів і ОС (Windows/Linux/macOS).
-* Працює перевірка сумісності модів (`HostEnvironmentCheck`).
-* Збережено обхід підписів чату та онлайн-сертифікатів Mojang для гри з друзями без ліцензії.
+## [0.5.x] — Pre-Release Milestones
+* Initial development of peer coordination protocol, cloud sync backends, and host indicator overlay.

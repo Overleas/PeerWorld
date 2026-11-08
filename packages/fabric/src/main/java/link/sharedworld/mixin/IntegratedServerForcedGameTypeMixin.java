@@ -1,6 +1,8 @@
 package link.sharedworld.mixin;
 
+import link.sharedworld.SharedWorldDevSessionBridge;
 import link.sharedworld.host.SharedWorldHostServerGate;
+import link.sharedworld.host.SharedWorldHostingManager;
 import link.sharedworld.host.SharedWorldPublishedJoinModePolicy;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.server.MinecraftServer;
@@ -20,5 +22,12 @@ abstract class IntegratedServerForcedGameTypeMixin {
                         SharedWorldHostServerGate.isManagedSharedWorldHost((MinecraftServer) (Object) this)
                 )
         );
+    }
+
+    @Inject(method = "getMaxPlayers", at = @At("HEAD"), cancellable = true)
+    private void peerworld$getMaxPlayers(CallbackInfoReturnable<Integer> cir) {
+        if (SharedWorldDevSessionBridge.isHostingSharedWorld() || SharedWorldHostServerGate.isManagedSharedWorldHost((MinecraftServer) (Object) this)) {
+            cir.setReturnValue(SharedWorldHostingManager.effectiveMaxPlayers());
+        }
     }
 }

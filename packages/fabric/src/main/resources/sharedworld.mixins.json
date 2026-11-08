@@ -9,6 +9,8 @@
     "E4mcSingleplayerOwnerCompatIntermediaryMixin",
     "E4mcSingleplayerOwnerCompatNamedMixin",
     "IntegratedServerForcedGameTypeMixin",
+    "PauseScreenMixin",
+    "PlayerTabOverlayMixin",
     "ServerChatSessionValidationMixin",
     "ServerboundKeyPacketCompatMixin",
     "VanillaBanCommandInterceptMixin",

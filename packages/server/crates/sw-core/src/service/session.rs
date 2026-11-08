@@ -18,7 +18,9 @@ pub async fn enter_session(
     request: &EnterSessionRequest,
     now: Instant,
 ) -> HttpResult<EnterSessionResponse> {
-    let actor = session_actor_of(svc, ctx, world_id).await?;
+    let mut actor = session_actor_of(svc, ctx, world_id).await?;
+    actor.hardware_score = request.hardware_score;
+    actor.allow_auto_host = request.allow_auto_host;
     // Access verdicts first; without touching coordinator state.
     if !actor.membership_active {
         let a = actor.clone();
@@ -243,7 +245,7 @@ pub async fn set_player_presence(
 }
 
 fn authority_args(epoch: Option<i64>, token: Option<&String>) -> HostAuthorityArgs {
-    HostAuthorityArgs { runtime_epoch: epoch, host_token: token.cloned() }
+    HostAuthorityArgs { runtime_epoch: epoch, host_token: token.cloned(), target_host_uuid: None }
 }
 
 pub async fn begin_finalization(
@@ -269,7 +271,8 @@ pub async fn complete_finalization(
     now: Instant,
 ) -> HttpResult<FinalizationActionResult> {
     let actor = session_actor_of(svc, ctx, world_id).await?;
-    let args = authority_args(request.runtime_epoch, request.host_token.as_ref());
+    let mut args = authority_args(request.runtime_epoch, request.host_token.as_ref());
+    args.target_host_uuid = request.target_host_uuid.clone();
     svc.realtime
         .registry
         .call(world_id, move |c| Box::pin(async move { c.complete_finalization(&actor, &args, now).await }))
@@ -299,7 +302,8 @@ pub async fn release_host(
     now: Instant,
 ) -> HttpResult<ReleaseHostResult> {
     let actor = session_actor_of(svc, ctx, world_id).await?;
-    let args = authority_args(request.runtime_epoch, request.host_token.as_ref());
+    let mut args = authority_args(request.runtime_epoch, request.host_token.as_ref());
+    args.target_host_uuid = request.target_host_uuid.clone();
     let graceful = request.graceful.as_ref().and_then(|v| v.as_bool()).unwrap_or(false);
     svc.realtime
         .registry

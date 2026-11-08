@@ -25,10 +25,12 @@ public final class LegacyMotdFormatter {
 
     public static List<Component> lines(String motd) {
         List<Component> components = new ArrayList<>();
-        if (motd == null || motd.isBlank()) {
+        String cleaned = link.sharedworld.screen.SharedWorldMetadataFormat.cleanMotd(motd);
+        if (cleaned.isBlank()) {
             return components;
         }
-        for (String line : motd.split("\n", -1)) {
+        cleaned = cleaned.replace("\r\n", "\n").replace('\r', '\n');
+        for (String line : cleaned.split("\n", -1)) {
             components.add(parseLine(line));
         }
         return components;

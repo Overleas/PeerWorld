@@ -7,6 +7,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
@@ -98,24 +99,52 @@ public final class SharedWorldCommands {
                 .then(Commands.argument("player", StringArgumentType.word())
                         .suggests(memberNames)
                         .executes(context -> banMember(context, apiClient, hostingManager, ioExecutor, clientMainThreadExecutor))));
+        SuggestionProvider<CommandSourceStack> onlineGuests = (context, builder) -> {
+            MinecraftServer server = context.getSource().getServer();
+            ServerPlayer hostPlayer = context.getSource().getPlayer();
+            if (server != null) {
+                for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+                    if (hostPlayer == null || !player.getUUID().equals(hostPlayer.getUUID())) {
+                        builder.suggest(link.sharedworld.versioned.ClientCompat.profileName(player.getGameProfile()));
+                    }
+                }
+            }
+            return builder.buildFuture();
+        };
         dispatcher.register(Commands.literal("peerworld")
                 .requires(source -> SharedWorldDevSessionBridge.isHostingSharedWorld())
                 .executes(SharedWorldCommands::showHelpCommand)
                 .then(Commands.literal("help").executes(SharedWorldCommands::showHelpCommand))
                 .then(Commands.literal("info").executes(context -> showInfoCommand(context, hostingManager)))
+                .then(Commands.literal("transfer")
+                        .then(Commands.argument("player", StringArgumentType.word())
+                                .suggests(onlineGuests)
+                                .executes(context -> transferHostCommand(context, hostingManager))))
                 .then(Commands.literal("backup")
                         .executes(context -> runBackupCommand(context, null, hostingManager))
                         .then(Commands.argument("name", StringArgumentType.greedyString())
-                                .executes(context -> runBackupCommand(context, StringArgumentType.getString(context, "name"), hostingManager)))));
+                                .executes(context -> runBackupCommand(context, StringArgumentType.getString(context, "name"), hostingManager))))
+                .then(Commands.literal("maxplayers")
+                        .executes(SharedWorldCommands::showMaxPlayersCommand)
+                        .then(Commands.argument("count", IntegerArgumentType.integer(2, 64))
+                                .executes(context -> setMaxPlayersCommand(context, hostingManager)))));
         dispatcher.register(Commands.literal("pw")
                 .requires(source -> SharedWorldDevSessionBridge.isHostingSharedWorld())
                 .executes(SharedWorldCommands::showHelpCommand)
                 .then(Commands.literal("help").executes(SharedWorldCommands::showHelpCommand))
                 .then(Commands.literal("info").executes(context -> showInfoCommand(context, hostingManager)))
+                .then(Commands.literal("transfer")
+                        .then(Commands.argument("player", StringArgumentType.word())
+                                .suggests(onlineGuests)
+                                .executes(context -> transferHostCommand(context, hostingManager))))
                 .then(Commands.literal("backup")
                         .executes(context -> runBackupCommand(context, null, hostingManager))
                         .then(Commands.argument("name", StringArgumentType.greedyString())
-                                .executes(context -> runBackupCommand(context, StringArgumentType.getString(context, "name"), hostingManager)))));
+                                .executes(context -> runBackupCommand(context, StringArgumentType.getString(context, "name"), hostingManager))))
+                .then(Commands.literal("maxplayers")
+                        .executes(SharedWorldCommands::showMaxPlayersCommand)
+                        .then(Commands.argument("count", IntegerArgumentType.integer(2, 64))
+                                .executes(context -> setMaxPlayersCommand(context, hostingManager)))));
         // Vanilla added integrated-server /kick in 1.20.2; register a session-only
         // fallback where it is absent (in practice: the 1.20.1 bucket).
         if (dispatcher.getRoot().getChild("kick") == null) {
@@ -422,12 +451,14 @@ public final class SharedWorldCommands {
 
         MinecraftServer server = source.getServer();
         boolean queued = manager.triggerManualBackup(
-                () -> server.execute(() -> source.sendSuccess(
-                        () -> Component.translatable(
-                                displayName == null ? "peerworld.command.backup_success" : "peerworld.command.backup_success_named",
-                                displayName == null ? "" : displayName),
-                        true
-                )),
+                () -> server.execute(() -> {
+                    source.sendSuccess(
+                            () -> Component.translatable(
+                                    displayName == null ? "peerworld.command.backup_success" : "peerworld.command.backup_success_named",
+                                    displayName == null ? "" : displayName),
+                            true
+                    );
+                }),
                 error -> server.execute(() -> source.sendFailure(
                         Component.translatable("peerworld.command.backup_failed", friendlyMessage(error))
                 ))
@@ -454,9 +485,87 @@ public final class SharedWorldCommands {
     private static int showHelpCommand(CommandContext<CommandSourceStack> context) {
         CommandSourceStack source = context.getSource();
         source.sendSuccess(() -> Component.translatable("peerworld.command.help_header"), false);
+        source.sendSuccess(() -> Component.translatable("peerworld.command.help_transfer"), false);
         source.sendSuccess(() -> Component.translatable("peerworld.command.help_backup"), false);
+        source.sendSuccess(() -> Component.translatable("peerworld.command.help_maxplayers"), false);
         source.sendSuccess(() -> Component.translatable("peerworld.command.help_info"), false);
         source.sendSuccess(() -> Component.translatable("peerworld.command.help_op"), false);
+        return 1;
+    }
+
+    private static int showMaxPlayersCommand(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+        int current = SharedWorldHostingManager.effectiveMaxPlayers();
+        source.sendSuccess(() -> Component.translatable("peerworld.command.maxplayers_current", current), false);
+        return 1;
+    }
+
+    private static int setMaxPlayersCommand(
+            CommandContext<CommandSourceStack> context,
+            Supplier<SharedWorldHostingManager> hostingManager
+    ) {
+        CommandSourceStack source = context.getSource();
+        int requested = IntegerArgumentType.getInteger(context, "count");
+        int clamped = Math.max(2, Math.min(64, (requested / 2) * 2));
+        SharedWorldHostingManager.setRuntimeMaxPlayers(clamped);
+        link.sharedworld.SharedWorldClientConfigStore.shared().setMaxPlayers(clamped);
+        source.sendSuccess(() -> Component.translatable("peerworld.command.maxplayers_set", clamped), true);
+        if (clamped > 16) {
+            source.sendSuccess(() -> Component.translatable("peerworld.command.maxplayers_warn"), false);
+        }
+        if (sourceIsHostingOwner(source) && hostingManager != null) {
+            SharedWorldHostingManager hm = hostingManager.get();
+            if (hm != null && hm.hostingWorld() != null) {
+                var world = hm.hostingWorld();
+                link.sharedworld.SharedWorldClient.ioExecutor().execute(() -> {
+                    try {
+                        String newMotd = link.sharedworld.screen.SharedWorldMetadataFormat.attachMaxPlayers(world.motd(), clamped);
+                        link.sharedworld.SharedWorldClient.apiClient().updateWorld(world.id(), world.name(), newMotd, null, null, false);
+                    } catch (Throwable t) {
+                        link.sharedworld.SharedWorldClient.LOGGER.warn("SharedWorld could not persist maxPlayers change to world metadata", t);
+                    }
+                });
+            }
+        }
+        return 1;
+    }
+
+    private static int transferHostCommand(
+            CommandContext<CommandSourceStack> context,
+            Supplier<SharedWorldHostingManager> hostingManager
+    ) {
+        CommandSourceStack source = context.getSource();
+        if (!SharedWorldDevSessionBridge.isHostingSharedWorld()) {
+            source.sendFailure(Component.translatable("peerworld.command.not_hosting"));
+            return 0;
+        }
+
+        MinecraftServer server = source.getServer();
+        if (server == null) {
+            return 0;
+        }
+
+        String targetName = StringArgumentType.getString(context, "player");
+        ServerPlayer targetPlayer = server.getPlayerList().getPlayerByName(targetName);
+        if (targetPlayer == null) {
+            source.sendFailure(Component.translatable("peerworld.command.transfer.player_not_found", targetName));
+            return 0;
+        }
+
+        ServerPlayer hostPlayer = source.getPlayer();
+        if (hostPlayer != null && hostPlayer.getUUID().equals(targetPlayer.getUUID())) {
+            source.sendFailure(Component.translatable("peerworld.command.transfer.already_host"));
+            return 0;
+        }
+
+        SharedWorldHostingManager manager = hostingManager.get();
+        if (manager == null) {
+            return 0;
+        }
+
+        net.minecraft.client.Minecraft.getInstance().execute(() -> {
+            manager.transferHostTo(targetPlayer.getUUID(), link.sharedworld.versioned.ClientCompat.profileName(targetPlayer.getGameProfile()));
+        });
         return 1;
     }
 

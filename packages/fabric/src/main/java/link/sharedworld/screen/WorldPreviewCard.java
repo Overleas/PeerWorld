@@ -9,12 +9,16 @@ import net.minecraft.client.gui.screens.FaviconTexture;
 
 /**
  * The world-icon well plus the server-list card preview shared by the create
- * and edit screens. Each screen keeps its own card Y (the edit screen centers
- * the card under its Replace World row, the create screen bottom-anchors it);
- * everything else about the two is identical and lives here.
+ * and edit screens. Provides a unified, centered layout model where all form
+ * controls, avatar/icon pickers, preview cards, and action buttons align
+ * cohesively without visual fragmentation or text overlaps.
  */
 final class WorldPreviewCard {
-    static final int ICON_SIZE = 48;
+    static final int ICON_SIZE = 60;
+    static final int ICON_GAP = 8;
+    static final int ROW_WIDTH = SharedWorldServerList.ROW_WIDTH; // 305
+    static final int ROW_HEIGHT = SharedWorldServerList.ROW_HEIGHT; // 36
+
     private static final String EDIT_ICON_SPRITE = "sharedworld:edit_icon";
     private static final String EDIT_ICON_HIGHLIGHTED_SPRITE = "sharedworld:edit_icon_highlighted";
     private static final String DELETE_ICON_HIGHLIGHTED_SPRITE = "sharedworld:delete_icon_highlighted";
@@ -23,21 +27,48 @@ final class WorldPreviewCard {
     private WorldPreviewCard() {
     }
 
-    static int cardX(ScreenRectangle contentArea) {
-        return contentArea.left() + (contentArea.width() - SharedWorldServerList.ROW_WIDTH) / 2;
+    static int formWidth(ScreenRectangle contentArea) {
+        return Math.min(ROW_WIDTH, Math.max(260, contentArea.width() - 24));
     }
 
-    /** The icon well sits centered between the right edge of the text fields and the card's right edge. */
+    static int formLeft(ScreenRectangle contentArea) {
+        return contentArea.left() + (contentArea.width() - formWidth(contentArea)) / 2;
+    }
+
     static int iconX(ScreenRectangle contentArea) {
-        int fieldsRight = contentArea.left() + 38 + Math.min(190, contentArea.width() - 140);
-        int previewRight = cardX(contentArea) + SharedWorldServerList.ROW_WIDTH;
-        return fieldsRight + ((previewRight - fieldsRight) - ICON_SIZE) / 2;
+        return formLeft(contentArea);
     }
 
-    /** The icon well sits centered between the content top and the card. */
-    static int iconY(ScreenRectangle contentArea, int cardY) {
-        int top = contentArea.top();
-        return top + ((cardY - top) - ICON_SIZE) / 2;
+    static int fieldsX(ScreenRectangle contentArea) {
+        return formLeft(contentArea) + ICON_SIZE + ICON_GAP;
+    }
+
+    static int fieldsWidth(ScreenRectangle contentArea) {
+        return formWidth(contentArea) - ICON_SIZE - ICON_GAP;
+    }
+
+    static int cardX(ScreenRectangle contentArea) {
+        return formLeft(contentArea);
+    }
+
+    static int startY(ScreenRectangle contentArea) {
+        return contentArea.top() + Math.max(6, (contentArea.height() - 162) / 2);
+    }
+
+    static int nameBoxY(ScreenRectangle contentArea) {
+        return startY(contentArea) + 14;
+    }
+
+    static int motdBoxY(ScreenRectangle contentArea) {
+        return startY(contentArea) + 54;
+    }
+
+    static int cardY(ScreenRectangle contentArea) {
+        return startY(contentArea) + 100;
+    }
+
+    static int extraButtonY(ScreenRectangle contentArea) {
+        return startY(contentArea) + 142;
     }
 
     static boolean iconHovered(int iconX, int iconY, int mouseX, int mouseY) {
@@ -45,11 +76,11 @@ final class WorldPreviewCard {
     }
 
     /**
-     * The icon well: the world icon, an always-visible pencil badge when it is
-     * editable (the well is a button, say so silently) and, while hovered, a
-     * dim overlay with the action that a click performs.
+     * The icon well: framed world icon, an always-visible pencil badge when it is
+     * editable, and a dim overlay with action sprite when hovered.
      */
     static void renderIconWell(GuiGraphics guiGraphics, FaviconTexture texture, int iconX, int iconY, boolean editable, boolean hovered, boolean clickDeletes) {
+        guiGraphics.fill(iconX - 1, iconY - 1, iconX + ICON_SIZE + 1, iconY + ICON_SIZE + 1, 0xFF4A4A4A);
         GuiBlit.favicon(guiGraphics, texture, iconX, iconY, ICON_SIZE);
         if (!editable) {
             return;
@@ -59,7 +90,7 @@ final class WorldPreviewCard {
         GuiBlit.sprite(guiGraphics, EDIT_ICON_SPRITE, iconX + ICON_SIZE - 14, iconY + ICON_SIZE - 14, 12, 12);
         if (hovered) {
             guiGraphics.fill(iconX, iconY, iconX + ICON_SIZE, iconY + ICON_SIZE, 0x80000000);
-            GuiBlit.sprite(guiGraphics, clickDeletes ? DELETE_ICON_HIGHLIGHTED_SPRITE : EDIT_ICON_HIGHLIGHTED_SPRITE, iconX + 12, iconY + 12, 24, 24);
+            GuiBlit.sprite(guiGraphics, clickDeletes ? DELETE_ICON_HIGHLIGHTED_SPRITE : EDIT_ICON_HIGHLIGHTED_SPRITE, iconX + (ICON_SIZE - 24) / 2, iconY + (ICON_SIZE - 24) / 2, 24, 24);
         }
     }
 
@@ -69,6 +100,7 @@ final class WorldPreviewCard {
         int contentY = rowY + SharedWorldServerList.CONTENT_PADDING;
         SharedWorldServerList.renderSelectedOutline(guiGraphics, rowX, rowY, true);
         GuiBlit.favicon(guiGraphics, texture, contentX, contentY, 32);
-        SharedWorldServerList.renderRowContents(guiGraphics, font, rowX, rowY, worldName, motd, SharedWorldText.playerCount(0, 8), PING_5_SPRITE);
+        int max = SharedWorldMetadataFormat.extractMaxPlayers(motd);
+        SharedWorldServerList.renderRowContents(guiGraphics, font, rowX, rowY, worldName, SharedWorldMetadataFormat.cleanMotd(motd), SharedWorldText.playerCount(0, max), PING_5_SPRITE);
     }
 }
